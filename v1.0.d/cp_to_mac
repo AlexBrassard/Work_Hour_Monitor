@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cp -r main.c whm.h whm_errcodes.h mem.d/ config.d/ sheets.d/ install_whm.sh MAC_OSX.d/

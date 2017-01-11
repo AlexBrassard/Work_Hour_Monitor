@@ -1,0 +1,84 @@
+Work Hours Monitor routines list
+
+Status legend:
+P----      Pseudo coded.
+-C---	   Coded.
+--M--	   Macro.
+---I-	   Static inline function.
+----O      Obsolete but kept for some reasons.
+
+|Status|	   |Function name|		|File|	                |Description|
+
+ -C---		    s_strcpy 			 config.d/config.c       Safely copy a string into another.
+ -C---		    s_ftoa                       config.d/config.c	 Convert the double argument to a pre-initialized string.
+ -C---		    whm_replace_spaces		 config.d/config.c	 Replace all spaces in input by underscores.
+ PC---	   	    whm_create_work_dir		 config.d/config.c       Create the program's main working directory WHM_WORK_DIR.
+ P----		    whm_handle_options		 config.d/config.c	 Handle options passed on the command line.
+ PC---		    whm_create_main_config	 config.d/config.c       Create the main configuration file.
+ -C---		    whm_pop_in_job_info		 config.d/config.c	 Orderly pop stacked items into the given _job_info_T *.
+ -C---		    whm_skip_comments		 config.d/config.c	 Skip a commentary character sequence.
+ PC---		    whm_read_main_config	 config.d/config.c	 Read the main config file, fill the whm_job_info_T array.
+ PC---		    whm_write_main_config	 config.d/config.c	 Write the content of the job_info_T array to given stream.
+ P----		    whm_add_to_config	 	 config.d/config.c	 Add the given company to the main configuration file.
+ P----		    whm_del_from_config		 config.d/config.c	 Remove the given company from the main config file.
+ P----		    whm_set_company_status	 config.d/config.c	 Set a given company's status to the given status.
+ -C---		    whm_backup_file		 config.d/config.c	 Backup file with given filename.
+ -C---		    whm_rm_backup_file		 config.d/config.c	 Remove the given backup filename. 
+ -C---		    whm_print_sheet_header	 sheets.d/utils.c	 Print the header message of an hour sheet.
+ -C---		    whm_print_new_sheet 	 sheets.d/utils.c	 Print an empty hour sheet to the given stream.
+ PC---		    whm_print_hour_sheet	 sheets.d/utils.c  	 Print the given (updated) hour sheet to the given stream.
+ -C---		    whm_pop_in_month_type	 sheets.d/utils.c        Pop a given stack's elems in their appropriate place.
+ -C---		    whm_pop_in_cumulatives	 sheets.d/utils.c	 Pop a given stack's elems in a month_T struct. 
+ PC---		    whm_create_hour_sheet	 sheets.d/utils.c  	 Create a new sheet to record worked hours.
+ PC---		    whm_read_hour_sheet		 sheets.d/utils.c	 All operations concerning reading an hour sheets.
+ -----		    whm_fetch_hs_content	 sheets.d/utils.c	 Returns a string, the content of the given hour sheet.
+ -----		    whm_fetch_hours		 sheets.d/utils.c	 Fetches the "hours" part of a given hour sheet.
+ -----		    whm_fetch_cumulatives	 sheets.d/utils.c	 Fetches the "cumulatives" part of a given hour sheet.
+ PC---		    whm_update_hour_sheet	 sheets.d/utils.c	 Update the given hour sheet.
+ PC---		    whm_find_first_dom   	 sheets.d/utils.c	 Find what day is/was the first of the current month.
+ -C---		    whm_make_sheet_path		 sheets.d/utils.c	 Make a pathname for the current company monthly sheet.
+ -C---		    whm_fetch_time		 mem.d/mem_utils.c       Allocate memory and fill up a whm_time_T* object.
+ -C---		    whm_free_time		 mem.d/mem_utils.c	 Free allocated memory of a whm_time_T* object.
+ -C---		    whm_init_day_type		 mem.d/mem_utils.c	 Initialize an object of type whm_day_T.
+ -C---		    whm_free_day_type		 mem.d/mem_utils.c	 Free allocated memory of a whm_day_T object.
+ -C---		    whm_init_week_type		 mem.d/mem_utils.c	 Initialize an object of type whm_week_T.
+ -C---		    whm_free_week_type		 mem.d/mem_utils.c	 Free allocated memory for a whm_week_T object.
+ -C---		    whm_init_month_type		 mem.d/mem_utils.c	 Allocated memory for a whm_month_T object.
+ -C---		    whm_free_month_type		 mem.d/mem_utils.c	 Release memory allocated to a whm_month_T.
+ -C---		    whm_init_job_info		 mem.d/mem_utils.c       Initialize a struct whm_job_info object.
+ -C---		    whm_free_job_info		 mem.d/mem_utils.c       Free an allocated whm_job_info object.
+ -C---		    whm_init_stack		 mem.d/mem_utils.c	 Allocate memory for a whm_stack_T data type.
+ -C---		    whm_free_stack		 mem.d/mem_utils.c	 Free memory of an allocated whm_stack_T data type.
+ P----		    main			 whm_main.c		 Main program function.
+ PC---		    whm_push			 whm_main.c		 Push given value onto given whm_stack_T.
+ PC---		    whm_pop			 whm_main.c		 Pop the given whm_stack_T's tos value and return it.
+ -CM--		    WHM_TRIM_TRAILING_NL	 whm.h			 Trim a trailing newline from a given string.
+ --M--		    WHM_UNFILLED_ENTRIES	 whm.h			 Skip entries like '--.--' from a given hour sheet.
+ -CM--		    WHM_MAKE_PATH                whm.h			 Append a slash in between head and tail.
+ -CM--		    WHM_ERRMESG 		 whm_errcodes.h		 Print a short help message describing the main options.
+
+ -----		    whm.h		         whm.h		         Main header file.
+ -----		    whm_errcodes.h		 whm_errcodes.h		 Program specific error codes and messages.
+
+
+
+
+
+/*********              Notes                **********/
+
+Obsoletes:
+ ----O		    whm_prompt_user		 config.d/prompts.c	 Prompt the user for the given requested information.
+ P---O*		    whm_main_config_header	 config.d/config.c       Print the hard coded header message to the given stream.
+ --M-O**	    WHM_CATSLASH                 whm.h                   Concatenate 2 strings and a slash in between.
+ -CM-O***	    WHM_SKIP_CONFIG_ENTRY        whm.h			 Skip an inactive job entry from the main config file.
+ P---O*&	    whm_backup_hour_sheet	 sheets.d/utils.c  	 Make a copy of the given hour sheet.
+ P----**&	    whm_create_company_dir	 config.d/config.c       Create a company's working directory.
+
+*        Replace by a simple static constant global value.
+**       Marked obsolete until I see if it's needed to write it down.
+***	 Possibly obsolete, or at least need a complete rewrite since
+	 _read_main_config() must store even the inactive entries in
+	 the job_array.
+*&       Possibly replaced by whm_backup_file.
+**&      Hard coded within the functions it happens.
+

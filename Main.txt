@@ -1,0 +1,177 @@
+/*
+ *
+ * Work Hour Monitor  -  Main function pseudo-code.
+ *
+ */
+
+
+int whm_automatic_mode(whm_config_T *config)
+{
+  Read each hour sheets found in the main configuration file.
+  Backup each hour sheets, keep backup names in an array.
+  Use whm_auto_update() on each sheet to prompt the user for the
+  number of hours worked for the current day and update the sheet's values.
+  Write the updated hour sheets.
+  Remove all sheet backups.
+
+  Return 0;
+
+}
+  
+
+
+
+
+void whm_get_args(int argc, char **argv,
+     		  int *opt_ind, char **args,
+		  int max_numof_opt)
+
+{
+  Starting at *opt_ind but not more than argc-1 and max_numof_opt times,
+  loop over each strings of argv
+    If the string begins by a dash, return. 
+    Else copy argv[*opt_ind] to args[i]
+    Increment *opt_ind.
+  Return.
+
+}
+
+
+int whm_fill_option(int argc, char **argv,
+    		    int *opt_ind,
+    	            whm_sheet_T **sheet,
+		    whm_option_T *option)
+
+{
+ char args[WHM_MAX_OPTIONS][WHM_OPTION_LENGHT]; Array of arguments, gotten from argv.
+
+  Switch on the ->operation field of the option object.
+  Case it's PRINT:
+    3 possible arguments: a company name, a month and a year.
+    Use whm_get_args to fill the args array.
+    For each elements of args,
+      If the first char of the current arg is not a digit,
+        Compare it against all company names of **sheet using whm_cmp_names().
+	The argument is discarded and the operation assumes no arguments.
+      Else
+        Make sure name has been given,
+	The first string is the number or name of the desired month,
+	the second string is the year number of the desired month.
+
+  Case it's UPDATE:
+    4 possible arguments: the company name, position, hours worked and date number.
+
+  Case it's ADD:
+    All arguments are discarded till the next option name or the end of options.
+
+  Case it's DELETE:
+    Only 1 possible argument: the company name.
+
+  Case it's MODIFY:
+    Only 1 possible argument: the company name.
+
+  Case it's LIST:
+    All arguments are discarded till the next option name or the end of options.
+
+  Default to a bad option error.
+
+  return 0;
+
+} 
+
+
+int whm_parse_options(int argc, char **argv,
+    		      whm_config_T *config,
+		      whm_time_T *time_o)
+
+{
+  whm_option_T *options[WHM_MAX_NUMOF_OPTIONS];
+
+  Make sure there are options on the command line.
+  Make sure all arguments are non-null.
+  Make sure argc is smaller than WHM_MAX_NUMOF_OPTIONS.
+
+  For each strings in argv (up to argc-1)
+    If it begins by a dash AND
+    it compares to a string in either one of the _LONG/SHORT_OPTIONS arrays
+      Switch on the index of the _long/short_options arrays
+      comparing it against the elements of the whm_option_names enum type.
+      Use the function whm_fill_option() to add the possible following
+      arguments of the matched option to the option object.
+
+
+  Each operations must be able to operate independently from the others
+  and that no matter the order they're given on the command line.
+  When a -h --help option appears anywhere on the  command line, all other options
+  are discarded and an help message is displayed on stderr,
+  then the program exits successfuly.
+
+  Loop a first time over all whm_option_T objects trying to find
+  a ->HELP operation and execute it.
+  
+  For each whm_option_T objects,
+    Switch on its ->operation field
+      Call the appropriate function.
+      Default to an error on the operation field.
+      
+  Return 0;
+}
+
+
+
+int main(int argc, char **argv)
+{
+
+  Try to open the WHM_WORKING_DIRECTORY.
+  If it fails
+    Use whm_new_dir() function to create it.
+  Else close the stream.
+
+  Try to open the WHM_CONFIGURATION_FILE.
+  If it fails
+    Use the whm_new_config() function to create it.
+
+  Read the configuration file using whm_read_config() function.
+  Fetch today's whm_time_T object.
+
+ Check that no options appear on the command line.
+  If there's none,
+    Use the whm_automatic_mode() function to continue processing
+    the hour sheets.
+  Else,
+    Use the whm_parse_options() function to parse all command line
+    options and execute the appropriate operations.
+
+  Remove the configuration file backup.
+  Free memory and exit.
+
+}
+
+
+NOTE: (for _read_sheet maybe?)
+  Loop over each entries of the configuration file
+    Try to open the company->work_dir
+    If it fails,
+      Use the whm_new_dir() function to create it.
+    Else close the stream.
+    Try to open the company->work_dir/current_month directory
+    If it fails,
+      Use the whm_new_dir() function to create it.
+    Else close the stream.
+    Try to open the sheet_T->name_curmonth_curyear.hour_sheet
+    If it fails,
+      Use the whm_new_sheet() function to create an empty one.
+    Backup the unmodified hour sheet, keep the backup name in an array.
+    Use the whm_read_sheet() function to read the current hour sheet,
+    populating the current whm_sheet_T* object.
+
+
+
+  Once options have been executed and the hour sheets updated,
+  Write the possibly modified hour sheets to disk.
+
+  Remove all hour sheet backups.
+
+  Close all streams, free memory, and exit with success.
+
+}

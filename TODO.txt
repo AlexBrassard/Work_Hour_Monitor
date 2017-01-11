@@ -1,0 +1,3 @@
+1. Add sutils.h to github and create a readme file for it.
+
+2. Review the whole logic of whm_inter_modify_config() 

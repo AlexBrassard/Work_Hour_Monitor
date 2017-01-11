@@ -1,0 +1,11 @@
+#include <stdio.h>
+
+
+int main (int argc, char **argv, char **envp)
+{
+  size_t i = 0;
+  while (envp[i] != NULL)
+    printf ("%zu - %s\n", i, envp[i]);
+  printf("\n");
+  return 0;
+}

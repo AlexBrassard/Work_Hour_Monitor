@@ -1,0 +1,94 @@
+TOP
+Very Important:
+Note: Night shift cash bonus.
+      When adding a company to the main configuration file, users will be asked
+      whether they are working night shifts or not, and if yes the amount of bonus
+      cash per hour will be demanded.
+      In the hour sheets, read() must expect to find a 'n' at the end of daily hours.
+      Write() must know when to write a 'n' at the end of the daily hours
+      Update must know when to add the night bonus and when not.
+      An 'double' entry in whm_job_info_T should be created, with -1 indicating no night bonus.
+      (Not 0 since one might want to have the night shifts indicated on the hour sheet, even
+      when no night bonus is being paid.
+      
+
+
+Very Important:
+Note: Choices? Yea.. what choices?
+      Whm will support both long and short options.
+      Options that has their arguments are surrounded by double square brackets
+      means the argument is optional, surrounded by single square brackets means a
+      mandatory option.
+      Options with a capital short name (ex: "-W, -P") cannot be by themselfs on the command line.
+      (In the cases of "-W and -P", they must be preceded by "-a", else they will be ignored.
+      The first options to be implemented are:
+      -p  --print [company_name] [[month]]  ; Both options are present: Print the [company name] [[month]] hour sheet to stdout.
+      	  	  		 	      Default: Print [company_name]'s latest hour sheet to stdout.
+      -a  --add                      	    ; CAN be used by itself (interactive mode).
+				              When NOT followed by any -P or -W options: Add's an entry for [company_name]
+      	  	  			      into the main configuration file and prompt user to enter the occupied positions
+					      and the obtained wage for each of them.
+					      When '-a, -P and -W' appear on the command line, an entry for [company name]
+					      is created, including an entry for [position_name] and its associated [wage].
+					      If [company_name] exists and '-a' was used alone, the entry is left untouched.
+					      If [company_name] exists and '-P and -W' also appear on the command line,
+					      if the -P [position_name] exists it's updated with [wage] value, else
+					      and entry for [position_name] is created.
+      -r  --remove [main|sheet]		    ; MUST be the only non upper-cased option on the command line.
+      	  	   			      If no other options follows [main|sheet] on the command line,
+					      -r main                             Removes the main configuration file.
+					      -r sheet                            Removes ALL hour sheets.
+					      -r -N company_name                  Removes company_name's entry from main config.
+					      -r -N company_name -P position_name Removes the position_name's entry of 
+					      	    		    		  company_name from main config.
+                                              -r -N company_name -M month	  Removes the month sheet of company_name.
+					      -r -N company_name -Y year          Removes all year sheets of company_name.
+					      (-M and -Y can be combined to remove a precise hour sheet.)
+					      [More to come as I think of them.]
+      -u  --update			    ; CAN be used by itself (interactive mode).
+      	  				      By default updates all hour sheets of active companies, overwritting
+					      those that has been already filled, for the current day.
+					      If '-a' is present, updates only the given date of the latest hour sheet.
+					      If used with the '-N' option, interactively updates only the [company_name]
+					      hour sheet, overwritting any existing value for the current day.
+					      If used with the '-N -P' options, interactively updates only the [position_name]
+					      of the given [company_name].
+					      
+      -N  --name  [company_name]            ; Useless by itself.
+      	  	  			      Records a company name.
+      -P  --pos   [position_name]           ; Useless by itself.
+					      Records a position name.
+      -W  --wage  [wage]		    ; Useless by itself.
+      	  	  			      Records a wage.
+      -D  --day   [day]                     ; Useless by itself.
+      	  	  			      Records a day number.
+      -M  --month [month]                   ; Useless by itself.
+      	  	  			      Records a month number.
+      -Y  --year  [year]                    ; Useless by itself.
+      	  	  			      Records a year number.
+
+
+Very Important:
+Note: Keep traces.
+      Backup the main configuration file and all hour sheets that gets
+      opened before any editing takes place. The names of backups must be kept throught
+      the entire life of the process and be removed only when the edited files have been
+      successfuly written out to disk.
+
+
+
+
+/***********************************************************************/
+Old or Completed Notes:
+
+Very Important: [DONE]
+Note: Keep it or remake it.
+      Both functions _read and _update_hour_sheet needs to be completely rewritten or
+      needs some serious revamping. The function _read_hour_sheet must be split in
+      many smaller parts making it much easier to update and modify the logic if needs
+      arise. Compare Harvey_Inox and SLB hour sheets to further investigate what's
+      wrong with the actual logic.
+
+      : Completely rewritten functions _update/read/write_hour_sheets and main_config.
+
+

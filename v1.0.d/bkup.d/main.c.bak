@@ -1,0 +1,238 @@
+/*
+ *
+ *  Work Hour Monitor   -   Main program.
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#include "whm.h"
+#include "whm_errcodes.h"
+
+/* Push (copy) the given value onto the given stack's top of stack. */
+int whm_push(whm_stack_T *stack, char *value)
+{
+  if (!stack || !value){
+    errno = EINVAL;
+    return -1;
+  }
+  /* stack->tos is always 1 more than the last element. */
+  if (s_strcpy(stack->string[stack->tos], value, WHM_MAX_PATHNAME_LENGHT) == NULL){
+    errno = WHM_INVALIDPUSH;
+    return -1;
+  }
+  /* 
+   * More a warning than an error. 
+   * ->size is garantied to be smaller than WHM_MAX_STACK_SIZE. (whm.h)
+   */
+  if (stack->tos + 1 >= (int)stack->size)
+    errno = WHM_STACKFULL;
+  else
+    stack->tos++;
+  
+  return 0;
+} /* whm_push() */
+
+
+/* Returns the value at stack[tos-1]. */
+char* whm_pop(whm_stack_T *stack)
+{
+  if (!stack){
+    errno = EINVAL;
+    return NULL;
+  }
+  if (stack->tos == -1) {
+    stack->tos = 0;
+    errno = WHM_STACKEMPTY;
+    return NULL;
+  }
+  if (stack->tos == 0 && stack->string[0][0] == '\0') {
+    errno = WHM_STACKEMPTY;
+    return NULL;
+  }
+  return stack->string[--stack->tos];
+}
+  
+
+int main(int argc, char **argv)
+{
+  FILE           *filestream = NULL;
+  size_t         ja_ind = 0, i = 0, sht_ind = 0;
+  whm_job_info_T **job_array = NULL;
+  whm_month_T    **read_sheets = NULL;
+  char           *main_config_bkup_name = NULL;
+  char           *hour_sheet_name = NULL;
+  char           time_string[WHM_TIME_STRING_LENGHT];
+  whm_time_T     *time_o = NULL;
+  
+  /* Check if the program's working directory exists, if not create it. */
+  if ((filestream = fopen(WHM_WORK_DIR, "r")) == NULL) {
+    /* Create the working directory specified in whm.h */
+    if (whm_create_work_dir(WHM_WORK_DIR) != 0) {
+      WHM_ERRMESG("Whm_create_work_dir");
+      goto errjmp;
+    }
+    /* Make sure it exists now. */
+    if ((filestream = fopen(WHM_WORK_DIR, "r")) == NULL){
+      WHM_ERRMESG("Fopen");
+      goto errjmp;
+    }
+  }
+  if (filestream != NULL){
+    fclose(filestream);
+    filestream = NULL;
+  }
+  /* Read the main configuration file, create it if it doesn't exists. */
+  if ((job_array = whm_read_main_config(WHM_MAIN_CONF_NAME, &ja_ind)) == NULL){
+    WHM_ERRMESG("Whm_read_main_config");
+    goto errjmp;
+  }
+  /* 
+   * Since the main configuration file is being rewritten every time its read,
+   * backup the original file into: .#filename# .
+   * Store the backup's pathname into main_config_bkup_name.
+   */
+  if ((main_config_bkup_name = calloc(WHM_MAX_PATHNAME_LENGHT, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    goto errjmp;
+  }
+  if (whm_backup_file(WHM_MAIN_CONF_NAME, main_config_bkup_name) != 0){
+    WHM_ERRMESG("Whm_backup_file");
+    goto errjmp;
+  }
+
+  /* Fetch the current date. */
+  if ((time_o = whm_fetch_time()) == NULL){
+    WHM_ERRMESG("Whm_fetch_time");
+    goto errjmp;
+  }
+  
+  /* 
+   * Allocate memory for an array of _month_T structure,
+   * one per active entry from the main configuration file.
+   */
+  if ((read_sheets = malloc(ja_ind * sizeof(whm_month_T*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  for (sht_ind = 0; sht_ind < ja_ind; sht_ind++)
+    if ((read_sheets[sht_ind] = whm_init_month_type()) == NULL){
+      WHM_ERRMESG("Whm_init_month_type");
+      goto errjmp;
+    }
+  if (whm_read_hour_sheet(read_sheets, ja_ind,
+			  job_array, time_o) != 0){
+    WHM_ERRMESG("Whm_read_hour_sheet");
+    goto errjmp;
+  }
+
+  /* Check for command line options and execute them. */
+
+  /* 
+   * If no command line options were present,
+   * check if today's entry is/are filled and
+   * prompt the user to fill them.
+   * The first parameter indicates whether the function is
+   * fetching its arguments from command line options (0)
+   * or if it interactively ask the user for values(>0).
+   */
+  for (sht_ind = 0; sht_ind < ja_ind; sht_ind++){
+    if (whm_update_hour_sheet(1, read_sheets[sht_ind],
+			      job_array[sht_ind],
+			      time_o) == -1) {
+      WHM_ERRMESG("Whm_update_hour_sheet");
+      goto errjmp;
+    }
+  }
+  
+  
+
+  /* 
+   * Once the program is about to exit, it must write the possibly modified 
+   * main configuration file and delete the backup created at the begining of the program.
+   */
+  if (whm_write_main_config(WHM_MAIN_CONF_NAME, job_array, &ja_ind) != 0){
+    WHM_ERRMESG("Whm_write_main_config");
+    goto errjmp;
+  }
+  if (whm_rm_backup_file(main_config_bkup_name) != 0){
+    WHM_ERRMESG("Whm_rm_backup_file");
+    goto errjmp;
+  }
+
+  /* Cleanup and exit. */
+  if (job_array){
+    for (i = 0; i < WHM_MAX_ENTRIES; i++)
+      if (job_array[i]){
+	whm_free_job_info(job_array[i]);
+	job_array[i] = NULL;
+      }
+    free(job_array);
+    job_array = NULL;
+  }
+  if (main_config_bkup_name){
+    free(main_config_bkup_name);
+    main_config_bkup_name = NULL;
+  }
+  if (time_o){
+    whm_free_time(time_o);
+    time_o = NULL;
+  }
+  if (read_sheets != NULL){
+    for (i = 0; i < ja_ind; i++)
+      if (read_sheets[i] != NULL){
+	whm_free_month_type(read_sheets[i]);
+	read_sheets[i] = NULL;
+      }
+    free(read_sheets);
+    read_sheets = NULL;
+  }
+  if (hour_sheet_name){
+    free(hour_sheet_name);
+    hour_sheet_name = NULL;
+  }
+  
+  return 0;
+
+ errjmp:
+  if (filestream != NULL){
+    fclose(filestream);
+    filestream = NULL;
+  }
+  if (job_array){
+    for (i = 0; i < WHM_MAX_ENTRIES; i++)
+      if (job_array[i]){
+	whm_free_job_info(job_array[i]);
+	job_array[i] = NULL;
+      }
+    free(job_array);
+    job_array = NULL;
+  }
+  if (main_config_bkup_name){
+    free(main_config_bkup_name);
+    main_config_bkup_name = NULL;
+  }
+  if (time_o){
+    whm_free_time(time_o);
+    time_o = NULL;
+  }
+  if (read_sheets){
+    for (i = 0; i < ja_ind; i++)
+      if (read_sheets[i]){
+	whm_free_month_type(read_sheets[i]);
+	read_sheets[i] = NULL;
+      }
+    free(read_sheets);
+    read_sheets = NULL;
+  }
+  if (hour_sheet_name){
+    free(hour_sheet_name);
+    hour_sheet_name = NULL;
+  }
+
+
+  return -1;
+  
+}

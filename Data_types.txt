@@ -1,0 +1,64 @@
+/*
+ *
+ * Work Hour Monitor  -  Custom data types.
+ *
+ */
+
+
+typedef struct whm_queue_type {
+  Array of strings,
+  Maximum lenght of a string,
+  Number of strings in the array (index of the first free element),
+  Maximum number of strings in the array,
+
+} whm_queue_T;
+
+
+typedef struct whm_config_type {
+  Status,
+  Name,
+  Working_dir,
+  Positions,
+  Wages,
+  Do pay holiday,
+  Night Prime,
+
+} whm_config_T;
+
+
+typedef struct whm_sheet_type {
+  Weeks,
+  Total hours,
+  Total earnings,
+  Total hours per positions per day,
+  Total earnings per positions per day,
+
+} whm_sheet_T;
+
+
+typedef struct whm_week_type {
+  Week number,
+  Total hours this week,
+  Total earnings this week,
+  Daily infos,
+
+} whm_week_T;
+
+
+typedef struct whm_day_type {
+  Date,
+  Total hours this day for each positions,
+  Total earnings this day for each positions,
+  Total hours this day, all positions combined,
+  Total earnings this day, all positions combined,
+
+} whm_day_T;
+
+
+typedef struct whm_time_type {
+  Date,
+  Year,
+  Week number,
+  Month number,
+
+} whm_time_T;

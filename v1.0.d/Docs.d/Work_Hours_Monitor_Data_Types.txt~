@@ -1,0 +1,26 @@
+*** This file is likely to get outdated, it serves as a model to start off with only. ***
+
+
+To hold information gathered from the configuration file(s)
+about each active jobs:
+
+  typedef struct 
+    name,
+    working directory,
+    number of position(s) occupied,
+    position(s) name(s),
+    position(s) wage(s)
+  whm_job_info_T;
+
+
+Will be used to parse the configuration file as well as hour sheets.
+  typedef struct
+    strings,
+    tos,
+    size
+  whm_stack_T;
+
+
+Used by _prompt_user() to choose with which message to prompt the user.
+  typedef enum
+    

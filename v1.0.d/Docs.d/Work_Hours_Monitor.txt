@@ -1,0 +1,64 @@
+main:
+	Check if the WHM_WORK_DIR exists.
+	  Create it if it does not.
+	Check if the main configuration file WHM_MAIN_CONF_NAME exists.
+	  Create it if it does not.
+	Check argc/argv for options and handle them now.
+	If nothing was present on the command line,
+	  Check if the default sheet(s) are filled.
+	  Exit if yes, Prompt the user if not.
+	    For each entries for which their status field is 1,
+	      If their directory doesn't exist, create it.
+	      Check for the job's directory configuration file create it if needed.
+	      open it and fill the remaining fields of the job_info structs,
+	Back up the current month's sheet before editing it.
+	Ask the user for the number of hours worked today.
+	Open the current sheet.
+	The sheet's buffer must be read backward
+	For each days a stack will be created.
+	For each weeks a stack will be created.
+	 Make sure all entries from the current date down to the first of the current
+	 month are either filled or padded with zeros.
+	 Calculation must be done on floats, but written in the file as a NUL terminated string.
+	 Weeks always begins at sunday, ends on saturday.
+	 The numbers to push in stacks are floats.
+	 snprintf can help make pretty strings.
+	Items are pushed on the stack from saturday backward to sunday
+	Push the worked hours number to the current date's stack.
+	Pad the remaining stacks with zeros.
+	Pop each stacks to the new sheet, starting at week[0]'s sunday.
+	Close the sheet.
+	Remove the backup.
+
+Options
+
+   help: -h
+   Print a short help message and exit.
+
+   update: -u [company name]
+   Update only the company whos name was given as argument, interactively, and exit.
+
+   -s [company name]
+   Set the given company name's status to active and exit. If company name doesn't exists
+   it will return an error message and code.
+
+   -S [company name]
+   Set the given company name's status to inactive and exit. If company name doesn't exists
+   it will return an error message and code.
+   
+   -a [company name]
+   Add company name to the main configuration file, interactively.
+
+   -r [company name]
+   Remove company name and working directory from the main configuration file and
+   working directory.
+
+
+Hour sheets
+   
+   A variable amount of positions for a given job is possible.
+
+   The first of the month may be any days of the week, all subsequence
+   date must follow the pattern lead by the month's first day..
+
+   The 

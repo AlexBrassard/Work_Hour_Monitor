@@ -1,0 +1,17 @@
+TOP
+Very Important:
+Note: Keep it or remake it.
+      Both functions _read and _update_hour_sheet needs to be completely rewritten or
+      needs some serious revamping. The function _read_hour_sheet must be split in
+      many smaller parts making it much easier to update and modify the logic if needs
+      arise. Compare Harvey_Inox and SLB hour sheets to further investigate what's
+      wrong with the actual logic.
+
+
+Very Important:
+Note: Keep traces.
+      Backup the main configuration file and all hour sheets that gets
+      opened before any editing takes place. The names of backups must be kept throught
+      the entire life of the process and be removed only when the edited files have been
+      successfuly written out to disk.
+

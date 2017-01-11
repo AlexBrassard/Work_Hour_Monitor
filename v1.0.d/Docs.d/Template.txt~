@@ -1,0 +1,100 @@
+/*************************************
+*                                    *
+* Template model only, DO NOT MODIFY *
+*                                    *
+*************************************/
+Explaination:
+        Semaine 
+        [Week day-date]
+Positions        Dim-    Lun-    Mar-    Mer-    Jeu-    Ven-    Sam-    Total hrs    Total $
+P1		 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx 	      xxxxx.xx
+P2		 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	 xx.xx	      xxxxx.xx
+...
+		 	 	 	 cumulated amount of $ for every positions    xxxxx.xx
+
+	----------------------------------------------------------------------------
+	Total sum of all sundays, mondays.. hours            Total hours this month
+        Total sum of all sundays... $                        Total $ this month
+
+
+
+Sample:
+
+/*
+ * Consultants SLB
+ *						          Month name, year
+ * Nombre d'heures travaillees par jours, pour le mois de ----------, ----.
+ *
+ */
+| _week_T |       |                         _day_T                           |     |       _week_T        |
+Semaine xx
+		  Dim xx   Lun xx   Mar xx   Mer xx   Jeu xx   Ven xx   Sam xx     Total hrs:   Total brut:
+Soudeur           --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+Operateur         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+total(h)          --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--
+total($)          ----.--  ----.--  ----.--  ----.--  ----.--  ----.--  ----.--                 -----.--$
+      		  	  	  	  	  	  	  	           
+Semaine xx
+		  Dim-     Lun-     Mar-     Mer-     Jeu-     Ven-     Sam-       Total hrs:   Total $:
+Soudeur           --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+Operateur         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+total (h)         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--
+total ($)         ----.--  ----.--  ----.--  ----.--  ----.--  ----.--  ----.--                 -----.--$
+      		  	  	  	  	  	  	  	           
+Semaine xx
+		  Dim-     Lun-     Mar-     Mer-     Jeu-     Ven-     Sam-       Total hrs:   Total $:
+Soudeur           --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+Operateur         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+total (h)         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--
+total ($)         ----.--  ----.--  ----.--  ----.--  ----.--  ----.--  ----.--                 -----.--$
+      		  	  	  	  	  	  	  	           
+Semaine xx
+		  Dim-     Lun-     Mar-     Mer-     Jeu-     Ven-     Sam-       Total hrs:   Total $:
+Soudeur           --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+Operateur         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+total (h)         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--
+total ($)         ----.--  ----.--  ----.--  ----.--  ----.--  ----.--  ----.--                 -----.--$
+      		  	  	  	  	  	  	  	           
+Semaine xx
+		  Dim-     Lun-     Mar-     Mer-     Jeu-     Ven-     Sam-       Total hrs:   Total $:
+Soudeur           --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+Operateur         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--       -----.--$
+total (h)         --.--    --.--    --.--    --.--    --.--    --.--	--.--	   ---.--
+total ($)         ----.--  ----.--  ----.--  ----.--  ----.--  ----.--  ----.--                 -----.--$
+
+/***************************************************************************/
+Cummulatif pour le mois courant:
+
+Dimanches:   ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Lundis:      ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Mardis:      ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Mercredis:   ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Jeudis:      ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Vendredis :  ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Samedis:     ---.--hrs  -----.--$
+Soudeur:     ---.--hrs  -----.--$
+Operateur    ---.--hrs	-----.--$
+
+Total        ---.--hrs	-----.--$
+Soudeur:     ---.--hrs	-----.--$
+Operateur:   ---.--hrs	-----.--$
+
+/***************************************************************************/

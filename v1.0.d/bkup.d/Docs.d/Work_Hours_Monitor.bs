@@ -1,0 +1,20 @@
+ /**********************************************************************
+ *								       *
+ * Goal:  A program that make, updates and orderly save working hours  *
+ *   	  sheets (~/text-files/Work_hours/Template.txt).               *
+ *								       *
+ **********************************************************************/
+
+
+The program should prompt the current logged-in user(s), at least once everyday,
+for the number of worked hours for the current day.
+The program can be run either directly on the command line or at user loggin or at
+a fixed time everyday.
+There should be empty templates for 28, 29, 30, and 31 days months.
+The program should fill the template, at its creation, with the appropriate
+informations (begining/ending date of the sheet, weeks numbers, and days numbers).
+When it's run, the program update the approprate sheet with the number of hours worked
+input by the user, defaulting to -- (0) if a user fail to enter it for a given day.
+The total of hours worked so far should be recalculated everyday or everytime the program
+is run in cases where a user would manualy update the sheet.
+Sheets shouldn't be readable by anybody else than the owner~.

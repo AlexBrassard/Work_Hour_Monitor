@@ -1,0 +1,619 @@
+/*
+ *
+ * Work Hour Monitor  -  Hour sheets related functions.
+ *
+ */
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include "../whm.h"
+#include "../whm_errcodes.h"
+
+
+
+
+
+/* Print a header message to the given stream. */
+int whm_print_sheet_header(whm_job_info_T *job_info,
+			   whm_time_T *time_o,
+			   FILE *stream)
+{
+  if (!job_info || !time_o || !stream){
+    errno = EINVAL;
+    return -1;
+  }
+
+  fprintf(stream,
+	  "/*\n * Work Hour Monitor\n *\n * %s\n *\n * Nombre d'heures travaillees par jours pour le mois de %s, %s.\n *\n */\n\n",
+	  job_info->name, time_o->month, time_o->year);
+
+  return 0;
+} /* whm_print_sheet_header() */
+
+
+/* 
+ * Returns the name of the first weekday of the month. 
+ * Arguments are all assumed to be valid.
+ * time_string must be at least WHM_TIME_O_STRING_LENGHT.
+ */
+int whm_find_first_dom(whm_time_T *time_o, int *week_num)
+{
+  int i = 0, week_day = 0;
+  int cur_date = atoi(time_o->date);
+  
+     
+  /* Find the week day number for the current date. */
+  while(week_day < 7 && strcmp(time_o->day, WHM_EN_WEEK_DAYS[week_day]) != 0) week_day++;
+
+  /* Find the week day name of the first of the month. */
+  while(cur_date != 1) {
+    if (--week_day == -1){
+      week_day = 6;
+      (*week_num)--;
+    }
+    --cur_date;
+  }
+
+  return week_day;
+  
+} /* whm_find_first_dom() */
+
+
+/* Print an hour sheet, complete with dates, into the given stream. */
+int whm_print_new_sheet(whm_job_info_T *job_info,
+			whm_time_T *time_o,
+			FILE *stream)
+{
+  int first_dom = -1, week_num = 0, day_c = 0;
+  size_t i = 0, month_day  = 1, week_c = 0;
+  if (!job_info || !time_o || !stream) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  week_num = atoi(time_o->week);
+  first_dom = whm_find_first_dom(time_o, &week_num);
+  while (week_c < 6) {
+    fprintf(stream, "\nSemaine %d\n                  ", week_num++);
+    day_c = 0;
+    if (week_c == 0){
+      for (day_c = 0; day_c < 7; day_c++){
+	if (day_c < first_dom)
+	  fprintf(stream, "%s --  ", WHM_FR_WEEK_DAYS[day_c]);
+	else {
+	  break;
+	}
+      }
+    }
+    while (day_c <= 6){
+      if (month_day > 31){ 
+	fprintf(stream, "%s --  ", WHM_FR_WEEK_DAYS[day_c++]);
+	continue;
+      }
+      fprintf(stream, "%s %2d  ", WHM_FR_WEEK_DAYS[day_c++], month_day++);
+      __asm__("");
+    }
+    fprintf(stream, " Total hrs:  Total brut:\n");
+    for (i = 0; i < job_info->numof_positions; i++)
+    fprintf(stream, "%-17s --.--   --.--   --.--   --.--   --.--   --.--   --.--    ---.--      -----.--$\n",
+	    job_info->position_name[i]);
+    fprintf(stream, "%-17s --.--   --.--   --.--   --.--   --.--   --.--   --.--    ---.--\n", "Total (h)");
+    fprintf(stream, "%-17s --.--   --.--   --.--   --.--   --.--   --.--   --.--                -----.--$\n", "Total ($)");
+    week_c++;
+  }
+  fprintf(stream, "\n/**********************************************************************/\nCummulatifs:\n");
+  for (day_c = 0; day_c < 7; day_c++){
+    fprintf(stream, "\n%-17s: ---.--hrs  -----.--$\n", WHM_FR_LG_WEEK_DAYS[day_c]);
+    for (i = 0; i < job_info->numof_positions; i++)
+      fprintf(stream, "%-17s: ---.--hrs  -----.--$\n", job_info->position_name[i]);
+  }
+  fprintf(stream, "\n%-17s: ---.--hrs  -----.--$\n", "Total");
+  for (i = 0; i < job_info->numof_positions; i++)
+    fprintf(stream, "%-17s: ---.--hrs  -----.--$\n", job_info->position_name[i]);
+  fprintf(stream, "\n/**********************************************************************/\n");
+  
+  return 0;
+
+} /* whm_print_new_sheet() */
+
+
+/*
+ * Make a filename concatenating together:
+ * The company's name followed by a '.',
+ * the full month name, an '_', the year including centuries,
+ * a '.' and the constant whm_hour_sheet_name.
+ * Take this new filename and append it to the company's ->work_dir, including a slash
+ * in between both.
+ * Make sure the total lenght of the new pathname don't exceed our limit. 
+ *
+ * Abreviated ex: ~/.whm.d/SLB.whmconfig/SLB_december_2016.hour_sheet
+ *
+ * (+4: for appended punctuation marks, 2x '_', '.' and '/')
+ */
+char* whm_make_sheet_path(char *new_pathname,
+			  whm_job_info_T *job_info,
+			  whm_time_T *time_o)
+{
+  char new_path[WHM_MAX_PATHNAME_LENGHT];
+  
+  
+  if (!new_pathname || !job_info || !time_o) {
+    errno = EINVAL;
+    return NULL;
+  }
+
+  if ((strlen(job_info->name) + 4 + strlen(time_o->month)
+       + strlen(time_o->year) + strlen(WHM_HOUR_SHEET_NAME))
+      + (strlen(job_info->work_dir)) >= WHM_MAX_PATHNAME_LENGHT) {
+    errno = WHM_SHEETNAMETOOLONG;
+    return NULL;
+  }
+
+  if (s_strcpy(new_path, job_info->work_dir, WHM_MAX_PATHNAME_LENGHT) == NULL){
+    WHM_ERRMESG("s_strcpy");
+    return NULL;
+  }
+  strcat(new_path, "/");
+  strcat(new_path, job_info->name);
+  strcat(new_path, "_");
+  strcat(new_path, time_o->month);
+  strcat(new_path, "_");
+  strcat(new_path, time_o->year);
+  strcat(new_path, ".");
+  strcat(new_path, WHM_HOUR_SHEET_NAME);
+
+  if (s_strcpy(new_pathname, new_path, WHM_MAX_PATHNAME_LENGHT) == NULL){
+    WHM_ERRMESG("s_strcpy");
+    return NULL;
+  }
+    
+									  
+
+  return new_pathname;
+
+} /* whm_make_sheet_path() */
+
+
+/*
+ * Checks if an hour sheet exists for the given time_string,
+ * if not creates one appending WHM_HOUR_SHEET_NAME (whm.h)
+ * to the given company name.
+ * ex:   ~/.whm.d/SLB.whmconfig/SLB.december_2016.hour_sheet
+ */
+int whm_create_hour_sheet(whm_job_info_T *job_info,
+			  whm_time_T *time_o,
+			  char *new_pathname,
+			  size_t np_size)
+{
+  FILE *filestream = NULL;
+  
+
+  if (!job_info || !time_o || !new_pathname || !np_size) {
+    errno = EINVAL;
+    return -1;
+  }
+  /* Adjust our local copy if the given value's too big. */
+  if (np_size > WHM_MAX_PATHNAME_LENGHT) np_size = WHM_MAX_PATHNAME_LENGHT;
+  
+  if (whm_make_sheet_path(new_pathname, job_info, time_o) == NULL) {
+    WHM_ERRMESG("Whm_make_sheet_path");
+    goto errjmp;
+  }
+  
+  /* Try to open a file at new_pathname and if we can, fail with WHM_SHEETEXISTS. */
+  if ((filestream = fopen(new_pathname, "r")) != NULL){
+    errno = WHM_SHEETEXISTS;
+    goto errjmp;
+  }
+  if ((filestream = fopen(new_pathname, "w")) == NULL){
+    WHM_ERRMESG("Fopen");
+    goto errjmp;
+  }
+
+  /* Print a formatted heading message to the new hour sheet. */
+  if (whm_print_sheet_header(job_info, time_o, filestream) != 0){
+    WHM_ERRMESG("Whm_print_sheet_header");
+    goto errjmp;
+  }
+  if (whm_print_new_sheet(job_info, time_o, filestream) != 0){
+    WHM_ERRMESG("Whm_print_new_sheet");
+    goto errjmp;
+  }
+
+  if (filestream){
+    fclose(filestream);
+    filestream = NULL;
+  }
+  return 0;
+
+ errjmp:
+  if (filestream){
+    fclose(filestream);
+    filestream = NULL;
+  }
+  return -1;
+  
+} /* whm_create_hour_sheet() */
+
+
+/*
+ * Depending on the given line number,
+ * pop in the given month_T object all elements
+ * contained within the given stack_T object.
+ *
+ * The caller is responsible of making sure no '-' appears
+ * when we're converting string to int/float.
+ */
+int whm_pop_in_month_type(size_t line_count,
+			  size_t week_ind,
+			  size_t numof_positions,
+			  size_t cur_pos,
+			  whm_month_T *month_info,
+			  whm_stack_T *sheet_stack)
+{
+  int day_ind = 0;
+  size_t i = 0;
+
+  if (!month_info || !sheet_stack
+      || line_count > WHM_MAX_NUMOF_POSITIONS+4
+      || week_ind > 6){
+    errno = EINVAL;
+    return -1;
+  }
+  /* Save the week number. */
+  if (line_count == 0){
+    month_info->week[week_ind]->week_number = atoi(whm_pop(sheet_stack));
+    whm_pop(sheet_stack);
+  }
+
+  /* Save the day's names and date number. */
+  else if (line_count == 1){
+    /* Get rid of "Total hrs:" and "Total brut:" */
+    for (i = 0; i < 4; i++) whm_pop(sheet_stack);
+    for (day_ind = 6; day_ind >= 0; day_ind--){
+      month_info->week[week_ind]->daily_info[day_ind]->daynum = atoi(whm_pop(sheet_stack));
+      if (s_strcpy(month_info->week[week_ind]->daily_info[day_ind]->dayname,
+		   whm_pop(sheet_stack),
+		   WHM_TIME_O_STRING_LENGHT) == NULL){
+	WHM_ERRMESG("S_strcpy");
+	return -1;
+      }
+    }
+  }
+
+  /* 
+   * Save the amount of hours worked for the given position number.
+   * +2: 1 for each lines already seen. 
+   */
+  else if (line_count > 1 && line_count < numof_positions+2){
+    month_info->week[week_ind]->weekly_cash = atof(whm_pop(sheet_stack));
+    month_info->week[week_ind]->weekly_hours = atof(whm_pop(sheet_stack));
+    for (day_ind = 6; day_ind >= 0; day_ind--)
+      month_info->week[week_ind]->daily_info[day_ind]->pos_hours[cur_pos] = atof(whm_pop(sheet_stack));
+    /* The position's name has already been saved in the whm_job_info_T structure. */
+    whm_pop(sheet_stack);
+  }
+  
+  /*
+   * Save the total of hours, all positions combined, for each days of the week
+   * and the total of hours, all positions combined, for the week.
+   * +1: The next line after the line of the last position. 
+   */
+  else if (line_count == (numof_positions+2)+1){
+    month_info->week[week_ind]->total_hours = atof(whm_pop(sheet_stack));
+    for (day_ind = 6; day_ind >= 0; day_ind--)
+      month_info->week[week_ind]->daily_info[day_ind]->total_hours = atof(whm_pop(sheet_stack));
+    /* We don't need the "total(h)" string. */
+    whm_pop(sheet_stack);
+  }
+  
+  /*
+   * Save the total amount of money made, all positions combined, for each days of the week
+   * and the total of money, all positions combined, made during the week.
+   * +2: The second next line after the line of the last position. 
+   */
+  else if (line_count == (numof_positions+2)+2){
+    month_info->week[week_ind]->total_cash = atof(whm_pop(sheet_stack));
+    for (day_ind = 6; day_ind >= 0; day_ind--)
+      month_info->week[week_ind]->daily_info[day_ind]->total_cash = atof(whm_pop(sheet_stack));
+    /* We don't need the "total($)" string. */
+    whm_pop(sheet_stack);
+  }
+  
+  /* Else it must be a syntax or logic error. */
+  else {
+    errno = WHM_INVALIDLINENUM;
+    return -1;
+  }
+
+  return 0;
+      
+} /* whm_pop_in_month_type() */
+
+
+/*
+ * Read the content of an hour sheet, store
+ * all informations found into a whm_month_T structure
+ * and return it to the caller.
+ * sheet_path is non-NULL only if a new hour sheet has been
+ * created using whm_create_hour_sheet.
+ */
+int whm_read_hour_sheet(whm_month_T **sheet_info,
+			size_t numof_sheets,
+			whm_job_info_T **job_info,
+			whm_time_T *time_o)
+{
+  size_t sht_char = 0, tmp_char = 0, sheet_content_len = 0;
+  size_t sheet_line_count = 0, week_ind = 0, cur_pos = 0, sheet_ind = 0;
+  FILE *sheet_stream = NULL;
+  whm_stack_T *sheet_stack = NULL;
+  char loc_sheet_path[WHM_MAX_PATHNAME_LENGHT];
+  char sheet_content[WHM_MAX_HR_SHEET_LENGHT];
+  char temp_string[WHM_TIME_O_STRING_LENGHT];
+
+  if (!time_o || !sheet_info
+      || !numof_sheets || !job_info){
+    errno = EINVAL;
+    return -1;
+  }
+  /* 
+   * Try to create the file, if it already exists, 
+   * _create_hour_sheet will return WHM_SHEETEXISTS.
+   */
+  while (sheet_ind < numof_sheets){
+    if (whm_create_hour_sheet(job_info[sheet_ind], time_o,
+			      loc_sheet_path,
+			      WHM_MAX_PATHNAME_LENGHT) != -1
+	|| errno == WHM_SHEETEXISTS){
+      ; /* Good. */
+    }
+    else {
+      WHM_ERRMESG("Whm_create_hour_sheet");
+      return -1;
+    }
+    /* The use of WHM_TIME_O_STRING_LENGHT here is arbitrary. */
+    if ((sheet_stack = whm_init_stack(WHM_TIME_O_STRING_LENGHT)) == NULL){
+      WHM_ERRMESG("Whm_init_stack");
+      goto errjmp;
+    }
+    if (s_strcpy(sheet_info[sheet_ind]->sheet_path, loc_sheet_path, WHM_MAX_PATHNAME_LENGHT) == NULL){
+      WHM_ERRMESG("S_strcpy");
+      goto errjmp;
+    }
+    if ((sheet_stream = fopen(loc_sheet_path, "r")) == NULL){
+      WHM_ERRMESG("Fopen");
+      goto errjmp;
+    }
+    
+    /* Read the hour sheet. */
+    memset(sheet_content, 0, WHM_MAX_HR_SHEET_LENGHT);
+    fread(sheet_content, sizeof(char), WHM_MAX_HR_SHEET_LENGHT-1, sheet_stream);
+    if (ferror(sheet_stream)){
+      WHM_ERRMESG("Fread");
+      goto errjmp;
+    }
+    sheet_content_len = strlen(sheet_content);
+    if (sheet_stream){
+      fclose(sheet_stream);
+      sheet_stream = NULL;
+    }
+    memset(temp_string, 0, WHM_TIME_O_STRING_LENGHT);
+    
+    
+    while(sht_char < sheet_content_len){
+      if (week_ind > 6) break; /* to enter the next loop and fill cumulatives. */
+      /* Skip comments. */
+      if (sht_char+1 < sheet_content_len){
+	if (sheet_content[sht_char] == '/'){
+	  if (sheet_content[sht_char+1] == '*'
+	      || sheet_content[sht_char+1] == '/'){
+	    if (whm_skip_comments(sheet_content,
+				  sheet_content_len,
+				  &sht_char) == -1){
+	      WHM_ERRMESG("Whm_skip_comments");
+	      goto errjmp;
+	    }
+	    sht_char++;
+	    continue;
+	  }
+	}
+	else if(sheet_content[sht_char] == '#'){
+	  if (whm_skip_comments(sheet_content,
+				sheet_content_len,
+				&sht_char) == -1){
+	    WHM_ERRMESG("Whm_skip_comments");
+	    goto errjmp;
+	  }
+	  sht_char++;
+	  continue;
+	}
+      }
+      
+      /* When seeing a space, NULL terminate the string, push it on the stack. */
+      else if (sheet_content[sht_char] == SPACE && tmp_char > 0){
+	temp_string[tmp_char] = '\0';
+	if (whm_push(sheet_stack, temp_string) != 0) {
+	  WHM_ERRMESG("Whm_push");
+	  goto errjmp;
+	}
+	memset(temp_string, 0, WHM_TIME_O_STRING_LENGHT);
+	tmp_char = 0;
+	sht_char++;
+	continue;
+      }
+      
+      /* 
+       * When seeing a newline, pop the current stack in the appropriate fields
+       * of the whm_month_T object.
+       */
+      else if (sheet_content[sht_char] == NEWLINE){
+	if (sheet_stack->tos > 0){
+	  if (cur_pos == job_info[sheet_ind]->numof_positions) cur_pos = 0;
+	  if (whm_pop_in_month_type(sheet_line_count,
+				    week_ind,
+				    job_info[sheet_ind]->numof_positions,
+				    ((sheet_line_count > 2 && sheet_line_count < job_info[sheet_ind]->numof_positions)
+				     ? cur_pos++ : cur_pos),
+				    sheet_info[sheet_ind],
+				    sheet_stack) != 0){
+	    WHM_ERRMESG("Whm_pop_in_month_type");
+	    goto errjmp;
+	  }
+	  /* When seeing 2 consecutives newlines, increment week_ind and continue */				
+	  if (sht_char+1 < sheet_content_len
+	      && sheet_content[sht_char+1] == NEWLINE){
+	    ++week_ind;
+	    sht_char += 2;
+	    sheet_line_count = 0;
+	    continue;
+	  }
+	  sht_char++;
+	  sheet_line_count++;
+	  continue;
+	  
+	}
+	/* Else just skip the newline. */
+	else {
+	  sht_char++;
+	  continue;
+	}
+      }
+      else if (sheet_content[sht_char] == '-'){
+	if (s_strcpy(temp_string, "-1", WHM_TIME_O_STRING_LENGHT) == NULL){
+	  WHM_ERRMESG("S_strcpy");
+	  goto errjmp;
+	}
+	tmp_char = strlen(temp_string)+1;
+	sht_char++;
+	continue;
+      }
+      
+      
+      
+      /* If no special characters are found, add the current one to the temporary string. */
+      temp_string[tmp_char] = sheet_content[sht_char];
+      ++tmp_char;
+      ++sht_char;
+    }
+
+    ++sheet_ind; /* Get next entry. */
+  }
+  if (sheet_stack){
+    whm_free_stack(sheet_stack);
+    sheet_stack = NULL;
+  }
+  
+  return 0;
+
+
+ errjmp:
+  if (sheet_stream){
+    fclose(sheet_stream);
+    sheet_stream = NULL;
+  }
+  if (sheet_stack){
+    whm_free_stack(sheet_stack);
+    sheet_stack = NULL;
+  }
+
+  return -1;
+  
+} /* whm_read_hour_sheet() */
+
+
+/* 
+ * Update the given hour sheet, _month_T structure.
+ * This function must be interactive unless whm is
+ * invoked using the -u or --update switches, in which 
+ * case it must automaticaly update the given sheet with the
+ * given information.
+ * When interactive is > 0, the user is prompted on stdout
+ * for revelant informations else the -u or --update switch 
+ * must have been used else it's a mistake.
+ */
+int whm_update_hour_sheet(size_t interactive,
+			  whm_month_T *hour_sheet,
+			  whm_job_info_T *job_info,
+			  whm_time_T *time_o)
+{
+  size_t pos_ind = 0, input_char = 0, i = 0, week_ind = 0, week_day = 0;
+  int c = 0;
+  char in;
+  char input[WHM_TIME_O_STRING_LENGHT];
+  
+
+  if (!hour_sheet || !job_info || !time_o){
+    errno = EINVAL;
+    return -1;
+  }
+  /* Find today's entry, represented by week_ind and week_day */
+  while (c < 31) {
+    if (week_day > 6) {
+      week_day = 0;
+      ++week_ind;
+    }
+    if (strcmp(time_o->day, hour_sheet->week[week_ind]->daily_info[week_day]->dayname) == 0)
+      if (c+1 == atoi(time_o->date)) break;
+    ++c;
+    ++week_day;
+  }
+  /* 
+   * Verify if the entry has already been filled. 
+   * In a loop so that in the future we can selectively update
+   * positions within an entry. 
+   * At the moment it's either all or nothing.
+   */
+  for (i = 0; i < job_info->numof_positions; i++){
+    if (hour_sheet->week[week_ind]->daily_info[week_day]->pos_hours[i] != -1) {
+      errno = WHM_ENTRYALREADYFILLED;
+      return -1;
+    }
+  }
+      
+  if (interactive){
+    printf("\n\n%s\t\t%s, %s\n\n",
+	   job_info->name, time_o->month, time_o->year);
+    while (pos_ind < job_info->numof_positions){
+      printf("%s %s,\nCombien d'heures avez-vous travaillees aujourd'hui en tant que %s: ",
+	     time_o->date, time_o->month, job_info->position_name[pos_ind]);
+      memset(input, 0, WHM_TIME_O_STRING_LENGHT);
+      while ((in = getchar())){
+	if (in == NEWLINE || in == EOF) {
+	  input[input_char] = '\0';
+	  break;
+	}
+	if (input_char >= WHM_TIME_O_STRING_LENGHT){
+	  errno = WHM_INPUTTOOLONG;
+	  return -1;
+	}
+	if (isdigit(in))
+	  input[input_char++] = in;
+	else {
+	  errno = WHM_INVALIDHOUR;
+	  return -1;
+	}
+      }
+      /* Update hours. */
+      hour_sheet->week[week_ind]->daily_info[week_day]->pos_hours[pos_ind] = atof(input);
+      
+      ++pos_ind;
+    }
+  }
+  /* 
+   * Else assume the -u or --update switch was used
+   * and that main passed the appropriate arguments to us.
+   */
+  else {
+    ;
+  }
+
+  return 0;
+  
+} /* whm_update_hour_sheet() */

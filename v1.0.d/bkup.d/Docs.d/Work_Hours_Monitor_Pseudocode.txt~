@@ -1,0 +1,320 @@
+Main work_hour_monitor program:
+
+int main(int argc, char **argv)
+{
+  Try to fopen the WHM_WORK_DIR
+  If it failed,
+    Call _create_work_dir.
+  Check once more that we can read WHM_WORK_DIR,
+  Fail hard if it's not possible.
+  Else close the stream.
+
+  From the WHM_WORK_DIR and the WHM_MAINCONF_NAME constants,
+  whm_catslash a configuration filename and
+  Call whm_read_main_config() to read the configuration file.
+
+  When the whm_job_info_T array is ready,
+  Call _handle_options to handle all passed command line options.
+
+  If the program hasn't terminated via options,
+  go through each elements of the whm_job_info_T array,
+    Open the job's working directory or
+    Call _create_company_dir if it didn't exists.
+    Find the current month's hour sheet or
+    Call _create_hour_sheet if it didn't exists.
+    Check if the entry(ies) for the current day are filled,
+    exit if yes.
+    Prompt the user for the number of hours worked for all positions of the current job
+    for the current day.
+    Call _update_hour_sheet.
+    Close the file.
+    Close the job's working directory.
+
+  Free all used memory,
+  Return 0.
+
+} /* main() */
+
+
+Create the program's main working directory if it doesn't exists.
+
+int whm_create_work_dir(char *dirname)
+{
+  If dirname is NULL,
+    Set errno to EINVAL
+    and return -1.
+
+  Try to open dirname,
+  If it succeed return WHM_DIREXISTS.
+  else use mkdir to create the dirname directory.
+  Make sure it succeed and if yes,
+  return 0.
+  else
+  return errno.
+
+} /* whm_create_work_dir() */
+
+  
+int whm_handle_options(int argc, char **argv)
+{
+  If argc is smaller or equal to 1 or argv is NULL
+    Set errno to EINVAL and return -1.
+  Use getopt() to handle options.
+  Any unknown options should print the help message.
+  Return 0 on success.
+
+} /* whm_handle_options() */
+
+
+int whm_create_main_config(char *filename)
+{
+  Check if the given filename is null.
+  Set errno to EINVAL and return -1 if so.
+  Look into WHM_WORK_DIR if filename exists
+  (or directly try to open filename if it's an absolute pathname.)
+  If it exists,
+    Set errno to WHM_CONFEXISTS.
+    return errno.
+
+  Create filename with permission 0600
+  and open it for writing.
+  Print the main configuration header message.
+  Ask the user informations regarding company(ies)
+  that will appear in the configuration file.
+
+  Print informations to filestream one job at a time
+  configuration file.
+  Close the filestream.
+
+  Return 0;
+
+} /* whm_create_main_config() */
+
+
+Returns an array of whm_job_info_T containing all infos related to jobs read from the
+main configuration file, also update the value of a pointer to it's first free element's index.
+
+whm_job_info_T** whm_read_main_config(char *filename, size_t *first_free_element)
+{
+  whm_job_info_T **job_array = NULL;
+
+  If filename is NULL set errno to EINVAL and return -1.
+  Check that filename exists and if not create it using _create_main_config().
+  Initialize a whm_stack_T stack of WHM_MAX_ENTRIES size.
+  Open filename in read-only mode.
+  Loop over each characters of the configuration file content.
+  Everything from a '/*' sequence to a '*/' sequence  or terminating NUL byte
+  is considered a commentary.
+  The first string to be pushed on the stack should be the status string,
+  which is 0 when the company is inactive, 1 when active.
+  If this field is set to 0, skip every characters untill 3 consecutive newlines or
+  the end of string is found.
+  Characters are copied to a temporary string one at a time
+  until a newline is found, which is the signal to push the string on
+  the stack.
+  When 3 consecutive newlines are found,
+    the current job_array[] struct must be filled by poping the elements
+    out of the stack in the proper order.
+    job_array's index must be incremented.
+
+  When the loop completes,
+  Return job_array.
+
+} /* whm_read_main_config() */
+
+
+This function does not do any backup before deleting and creating
+the main configuration file.
+int whm_write_main_config(char *filename, whm_job_info_T **job_array)
+{
+  Verify parameters.
+  If filename exists, delete it.
+  Create filename and print the file header to the filestream.
+  For each objects in job_array,
+  print the information to the filestream
+  Close the stream.
+  Return 0.
+
+} /* whm_write_main_config() */
+  
+Function called when the -a option is used on the command line.
+
+int whm_add_to_config(whm_job_info_T **job_array, size_t *numof_elements)
+{
+  Backup the main configuration file.
+  Use whm_read_main_config() to read the main configuration file and see if
+  enough room is left for one more active entry,
+  Ask the user all information needed to fill in the new job_info_T object.
+  Use whm_write_main_config() to save the new entry in the configuration file.
+
+} /* whm_add_to_config() */
+
+Function called when the -r option is used on the command line.
+
+int whm_del_from_config(char *job_name)
+{
+  Backup the main configuration file.
+  Read the main configuration file using whm_read_main_config().
+  Loop over each elements of the job_info_T array and look for the
+  name given by the option's argument.
+  Reset all fields of this object.
+  Rearrange the array of job_info_T.
+  Use whm_write_main_config to save the configuration file.
+
+} /* whm_del_from_config() */
+
+
+Function called when the -s option is used on the command line.
+int whm_set_company_status(char *job_name, int status)
+{
+  Make sure job_name isn't null else set errno to EINVAL.
+
+  Backup the main configuration file.
+  Read the main configuration file using whm_read_main_config().
+  Loop over each elements of the job_info_T array and look for the
+  job name given by the option's argument.
+  When found, set the status field of this job to status.
+  Use whm_write_main_config() to create the new configuration file.
+  Remove the backup file.
+  return 0;
+
+} /* whm_set_company_status() */
+
+
+Print a header to the main configuration file.
+void whm_main_config_header(FILE *filestream)
+{
+  Print a pretty header to the given stream.
+
+} /* whm_main_config_header() */
+
+
+int whm_create_company_dir(char *dirname)
+{
+  Set errno to EINVAL if dirname is NULL.
+
+  If the directory already exists,
+    Set errno to WHM_DIREXISTS
+    and return it.
+
+  Use mkdir() to create the requested directory.
+  return 0;
+} /* whm_create_company_dir() */
+
+
+Create an hour sheet with all fields set to zeros.
+int whm_create_hour_sheet(whm_job_info_T *job, char *time_string)
+{
+  Make sure job isn't NULL.
+
+  Fetch the date.
+  Make sure no hour sheet already exists for the current month.
+  Create one in write mode with permission 0600
+  Use the WHM_PRINT_SHEET_HEADER to print the header message of the new hour sheet.
+  Use the WHM_PRINT_EMPTY_SHEET macro to print the empty sheet to
+  the new file_stream.
+  Close the stream.
+  Return 0;
+
+} /* whm_create_hour_sheet() */
+
+Read the given worksheet and returns all informations contained within
+the hour sheet in an array of whm_week_T data type.
+whm_week_T** whm_read_hour_sheet(char *sheetpath, whm_job_info_T *job_info)
+{
+  Make sure sheetpath and job_info aren't NULL.
+  Try to open sheetpath, it we fail to read it set errno to WHM_CANTREADSHEET
+  and return NULL;
+
+  We need a line count, line number 2, (1 being the "week number" line), needs to be
+  proccessed a little differently:
+  the 4 last strings pushed on that stack must be poped but not stored.
+
+  Put all non-space/newline characters into a temporary string that will be pushed on
+  the local stack_T once a space/newline character happen to be found.
+  When reaching a newline character, the week_T structure must be updated with the
+  stacked week's information.
+  Once all 5 week objects of this month are filled,
+  we can use the week_T array itself to fill the structs' remaining fields.
+
+  When all fields of the array's structures are filled with values read from the given hour sheet,
+  return the array itself to the caller.
+
+} /* whm_read_hour_sheet() */
+
+
+Update the given whm_week_T object, gotten from a previous call to _read_hour_sheet,
+with values obtained either interactively by prompting the user for answers or via
+command line options.
+whm_week_T** whm_update_hour_sheet(whm_week_T **old, char *date_string,
+	     		           char **hours_worked)
+{
+  Make sure old isn't NULL else fail with errno set to EINVAL.
+
+  Remember that month dates start at 1 to max 31, while arrays goes
+  from 0 to 30.
+
+  For each positions of the current date, enter the proper values into
+  the ->daily_info->pos_hours[], calculate the amount of money earned for the position,
+  add all values of the ->->pos_hours[] array and update the ->->d_total_hours field, and
+  add the amount of money earned from all positions to update the ->->d_total_cash field.
+  Update the daynum and dayname fields.
+  Return the modified object.
+
+} /* whm_update_hour_sheet() */
+
+
+Print the given hour sheet to stdout.
+int whm_display_hour_sheet(char *content)
+{
+  return printf("%s\n", content);
+} /* whm_display_hour_sheet() */
+
+int whm_backup_hour_sheet(char *content, char *filename)
+{
+  Make sure content isn't NULL.
+  Concatenate '.bkup' at the end of filename.
+  write content to filename.bkup, overwritting
+  any previous bkup file of the same name.
+
+  Return 0;
+
+} /* whm_backup_hour_sheet() */
+
+
+Takes the current date and week day and return which
+week day (sunday to saturday) the first of the month is/was
+in the form of an enum, representing the corresponding string in
+the constant array WHM_FR_WEEK_DAYS[][]
+whm_wday_T whm_find_first_dom(char *weekday, int date)
+{
+  Make sure weekday isn't NULL and date is between 1 and 31.
+  Make a counter that will decrement from 6 to 0 inclusively,
+  restarting to 6 everytime it gets to -1,
+  day 0 begin sunday, 6 saturday.
+  The counter begins at the value of the given weekday, and
+  will determine the weekday of the first of the month.
+  Starting at the given date, we substract 1 until we reach 1,
+  and then return the counter.
+}
+
+
+int whm_push(whm_stack_T *stack, char *value)
+{
+  Make sure stack and value aren't NULL.
+  Check that the stack hasn't reached its maximum
+  capaticity, else return WHM_STACKFULL;
+  Use SU_strcpy to make sure value fits in stack.
+  Increment the tos.
+  return 0;
+
+} /* whm_push() */
+
+char* whm_pop(whm_stack_T *stack)
+{
+  Make sure stack isn't NULL.
+  Make sure that tos is bigger than 0 before decrementing it.
+  If the ->tos is -1, ->string is empty.
+  Return stack->string[stack->tos].
+
+} /* whm_pop() */

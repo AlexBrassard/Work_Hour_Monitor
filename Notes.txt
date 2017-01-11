@@ -1,0 +1,73 @@
+/*
+ *
+ * Work Hour Monitor v2.0  -  Notes.
+ *
+ */
+TOP
+Important
+Note: Ignore any comments your hear, but remember all of them just in case:
+    Since the configuration file should not be edited by hand,
+    the position of commentaries and the comments themselfs should not
+    be recorded but it will be very required for operations on hour sheets.
+
+
+
+Note: Install me properly:
+    The installation script needs to be reworked. First, a makefile must be created
+    to handle everything related to program's compilation.
+    The install script should interactively create (with the option to do it automaticaly)
+    the 'whm_sysdep.h' file, which is mostly system/user dependent pathnames.
+
+
+Mixed Notes:
+  - Use fgets to read one line at a time.
+  - The configuration file should not be edited by hand.
+  - No streams should be passed through functions.
+  - A separate header should be made for all values (pathnames)
+    a user must set at the program installation.
+    The installation script will create this file and prompt the
+    user for all required system specific values.
+  - Make sure it's easy to add more options.
+  - The function to read hour sheets should not depend directly on sheet_T->numof_positions.
+    It should know when the configuration file has changed and should be able to reflect
+    these changes.
+  - Every run:
+    . Check if the .whm.d directory exist.
+    . Check if the configuration file exist and is valid.
+    . Read the configuration file, populating internal structure.
+    . Fetch the current date.
+    . Check that each company found in the configuration file has an existing working directory.
+    . Check that the current year directory exists for each company.
+    . Check that the hour sheet for the current month for each company exist.
+    . Backup all required hour sheets.
+    . Read all required hour sheets.
+    . Check for and execute command line options (not executing the next points).
+    . When no options were passed, interactively update all non-filled hour sheets.
+    . Write all updated hour sheets.
+    . Delete all hour sheet backups.
+    . Free all memory and exit.
+  - Options are: ((): non required options.)
+    . -p  --print  [name()] [year()] [month()]			Print an hour sheet to stdout.
+    . -u  --update [name()] [position()] [hours()] [date()]	Update a company's hour sheet.
+    . -a  --add    (fully interactive) 		 		Add a company to the configuration file.
+    . -d  --delete [name()]					Delete a company from the configuration file.
+    . -m  --modify [name()] [position()] [field()] [value()]	Modify an existing entry in the configuration file.
+    . -l  --list   						Print a list of the companies names in the configuration file.
+    . -h  --help  						Print a short help message.
+
+The idea:
+    Work Hour Monitor will prompt its users at least once a day
+    for the number of hours worked.
+    A configuration file will be used
+    to store information about tracked companies, and use this
+    info to create, once a month, an hour sheet for that company
+    for that month.
+    WHM should expect all of the content of the ~/.whm.d/ directory
+    to be edited by hand and should reflect these changes the next
+    time it's run.
+    All files within the ~/.whm.d/ directory should be editable
+    interactively within WHM or directly from switches on the command line.
+    WHM will calculate the amount of hours and money made for each active
+    company in the configuration file.
+    WHM should expect that the number of parameters that influence a salary
+    can vary and it should be built so it's easy to add/remove any.

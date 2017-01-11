@@ -1,0 +1,39 @@
+/*
+ *
+ *  Work hours monitor  -  Main configuration file.
+ *
+ * Sample only.
+ *
+ */
+
+# Line begining by a '#' are commentaries and ignored till the end of line.
+
+1 entry per line:
+Status integer; 1 active, the user will be prompted to enter hours for this company,
+       		0 unactive, the company will be ignored.
+Company name
+path of this company's sheet directory, relative to WHM_WORK_DIR.
+The number of positions within the company.
+Position(s) in the company.
+Wages of each positions in the company.
+
+
+2 empty lines between each companies.
+
+
+Sample:					     In config line numbers:
+
+1                                             0
+SLB					      1
+/home/lappop/.whm.d/slb/		      2
+2					      3
+soudeur operateur			      4
+xxx.xx  xxx.xx				      5
+
+
+0					      0
+Harvey_Inox				      1
+/home/lappop/.whm.d/Harvey_Inox/	      2
+1					      3
+operateur				      4
+xxx.xx					      5
