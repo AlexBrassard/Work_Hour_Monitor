@@ -500,9 +500,9 @@ int whm_modify_config(char *company,
   switch(field){
   case F_STATUS:
     if (value[0] == 'a' || value[0] == 'A')
-      config->status = 1;
+      configs[c_ind]->status = 1;
     else 
-      config->status = 0;
+      configs[c_ind]->status = 0;
     break;
 
   case F_EMPLOYER:
@@ -637,143 +637,118 @@ int whm_modify_config(char *company,
 } /* whm_modify_config() */
 
 
+/* 
+ * Interactively get a company name to feed 
+ * to whm_modify_config() or whm_add_config().
+ * A null return value with errno set to WHM_COMPANYCREATED
+ * indicates the company was created and its entry does
+ * not need to be modified and the new company name is stored in string.
+ */
+char* whm_get_company_name(char *string, size_t string_s,
+			   int *max_config_ind,
+			   whm_config_T **configs)
+{
+  char answer[WHM_NAME_STR_S];
+  int c_ind = 0, company_found = 0;
+
+  if (!string || !string_s || !max_config_ind
+      || !*max_config_ind || !configs) {
+    errno = EINVAL;
+    return NULL;
+  }
+
+  while (1) {
+  ask_company_name:
+    if (whm_ask_user(MODIF_COMPANY_NAME, string, string_s,
+		     NULL, 0) != 0) {
+      WHM_ERRMESG("Whm_ask_user");
+      return NULL;
+    }
+    if (strstr(string, "list") != NULL){
+      if (whm_list_config_names(*max_config_ind, configs) != 0){
+	WHM_ERRMESG("Whm_list_config_names");
+	return NULL;
+      }
+      continue;
+    }
+    else break;
+  }
+
+  /* 
+   * Verify the given company name exist, 
+   * else propose to create an entry for it.  
+   */
+  for (c_ind = 0; c_ind < *max_config_ind; c_ind++)
+    if (strcmp(string, configs[c_ind]->employer) == 0){
+      ++company_found;
+      break;
+    }
+
+  if (!company_found) {
+    if (whm_ask_user(MODIF_UNKNOWN_COMPANY, answer,
+		     WHM_NAME_STR_S, NULL, 0) != 0){
+      WHM_ERRMESG("Whm_ask_user");
+      return NULL;
+    }
+    if (answer[0] == 'o' || answer[0] == 'O'
+	|| answer[0] == 'y' || answer[0] == 'Y'){
+      if (whm_add_config(max_config_ind, configs) != 0){
+	WHM_ERRMESG("Whm_add_config");
+	return NULL;
+      }
+      errno = WHM_COMPANYCREATED;
+      return NULL;
+    }
+    else goto ask_company_name;
+  }
+  
+  return string;
+
+} /* whm_get_company_name() */
+
+
+/* Interactively ask the field to edit from the configuration entry. */
+int whm_get_field_name(char *company,
+		       int max_config_ind,
+		       whm_config_T **configs)
+{
+  char value[WHM_NAME_STR_S];
+  int intvalue = 0;
+  
+  if (!company || !max_config_ind || !configs) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  while (1) {
+    if (whm_ask_user(MODIF_CONFIG_FIELD, value,
+		     WHM_NAME_STR_S,
+		     NULL, 0) != 0) {
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    if (strstr(value, "list") != NULL){
+      if (whm_list_config_fields(company, max_config_ind, configs) != 0){
+	WHM_ERRMESG("Whm_list_config_fields");
+	return -1;
+      }
+    }
+    else if (isdigit(value[0])) break;
+  }
+
+  return ((intvalue = atoi(value)));
+
+} /* whm_get_field_name() */
+
+
 /* Interactively modify one or more entry(ies) from the configuration file. */
 int whm_inter_modify_config(int max_config_ind,
 			    whm_config_T **configs)
 {
-  char company[WHM_NAME_STR_S], position[WHM_NAME_STR_S];
-  char value[WHM_MAX_PATHNAME_S], answer[WHM_NAME_STR_S];
-  int c_ind = 0, company_found = 0;
-  enum whm_config_field_type field = 0;
 
-
-  if (!configs || max_config_ind < 0) {
-    errno = EINVAL;
-    return -1;
-  }
-  puts("\nWork Hour Monitor\nModification du fichier de configuration\n");
-  /* 
-   * First ask for the company name, then in a loop
-   * ask which field(s) needs to be modified and depending
-   * on the desired field, ask for the remaining information(s).
-   */
-  while(1){
-  ask_company_name:
-    if (whm_ask_user(MODIF_COMPANY_NAME, company,
-		     WHM_NAME_STR_S,
-		     NULL, 0) == -1) {
-      WHM_ERRMESG("Whm_ask_user");
-      return -1;
-    }
-    if (strcmp(company, "list") == 0 || strcmp(company, "liste") == 0){
-      if (whm_list_config_names(max_config_ind, configs) != 0){
-	WHM_ERRMESG("Whm_list_config_names");
-	return -1;
-      }
-    }
-    else {
-      break;
-    }
-  }
-  /* 
-   * Verify the given company exists and
-   * if it doesn't exist, ask the user to create it. 
-   */
-  for(; c_ind < max_config_ind; c_ind++)
-    if (strcmp(configs[c_ind]->employer, company) == 0){
-      company_found++;
-      break;
-    }
-
-  if (!company_found){
-    if (whm_ask_user(ADD_UNKNOWN_COMPANY,
-		     answer, WHM_NAME_STR_S,
-		     NULL, 0) == -1){
-      WHM_ERRMESG("Whm_ask_user");
-      return -1;
-    }
-    if (answer[0] == 'o' || answer[0] == 'O'){
-      if (whm_add_config(&c_ind, configs) != 0){
-	WHM_ERRMESG("Whm_add_config");
-	return -1;
-      }
-      /* Return now as whm_add_config() asked for all revelant informations. */
-      return 0;
-    }
-    else goto ask_company_name;
-  }
-
-  /*
-   * Ask which field(s) needs to be modified.
-   * "list" or "liste" lists the modifiable fields of the configuration file
-   * and their respective values.
-   */
- ask_config_field:
-  if (whm_ask_user(MODIF_CONFIG_FIELD, answer, WHM_NAME_STR_S,
-		   configs[c_ind], 0) != 0) {
-    WHM_ERRMESG("Whm_ask_user");
-    return -1;
-  }
-  if (strcmp(answer, "list") == 0 || strcmp(answer, "liste") == 0) {
-    if (whm_list_config_fields(company, max_config_ind, configs) != 0){
-      WHM_ERRMESG("Whm_list_config");
-      return -1;
-    }
-    goto ask_config_field;
-  }
-  else if (!isdigit(answer[0])) goto ask_config_field;
-  field = atoi(answer);
-
-  /* Switch on the given field, then ask user for the apropriate value. */
-  switch(field) {
-  case F_STATUS:
-    if (whm_ask_user(F_STATUS, answer, WHM_NAME_STR_S,
-		     configs[c_ind], 0) != 0){
-      WHM_ERRMESG("Whm_ask_user");
-      return -1;
-    }
-    break;
-
-  case F_POSITION:
-    /* Some answers might contain 2 words and a space in between. */
-    if (whm_ask_user(F_POSITION, value, (WHM_NAME_STR_S*2)+1,
-		     configs[c_ind], 0) != 0){
-      WHM_ERRMESG("Whm_ask_user");
-      return -1;
-    }
-    /* 
-     * Split the string into words, the zeroth being the position name,
-     * the first either the new position name or the wage, depending on the
-     * zeroth word.
-     */
-
-    break;
-
-  case F_WAGE:
-    break;
-
-  case F_NIGHT_PRIME:
-    break;
-
-  case F_HOLIDAY_PAY:
-    break;
-
-  default:
-    errno = WHM_INVALIDFIELD;
-    return -1;
-  }
-
-  if (whm_modify_config(company, position,
-			field,
-			((field == F_POSITION) ? value : answer),
-			max_config_ind,
-			configs) != 0){
-    WHM_ERRMESG("Whm_modify_config");
-    return -1;
-  }
   
   return 0;
-}
+} /* whm_inter_modify_config() */
 
 
 /* Print to stdout a list of all company names within the configuration file. */
@@ -822,14 +797,17 @@ int whm_list_config_fields(char *company,
     if (!configs[c_ind]) break;
     if (strcmp(configs[c_ind]->employer, company) == 0){
       printf("\nWork Hour Monitor\nList of modifiable fields for %s's configuration file entry.\n\n", company);
-      printf("%-18s %zu\n%-18s %s\n%-18s ", "Status:", configs[c_ind]->status,
+
+      printf("0 - %-18s %zu\n1 - %-18s %s\n2 - %-18s ", "Status:", configs[c_ind]->status,
 	     "Employer:", configs[c_ind]->employer,
 	     "Positions names:");
       for (; i < configs[c_ind]->numof_positions; i++)
 	printf("%-18s ", configs[c_ind]->positions[i]);
-      printf("\n%-18s ", "Position wages:");
+
+      printf("\n3 - %-18s ", "Position wages:");
       for (i = 0; i < configs[c_ind]->numof_positions; i++)
 	printf("%.2f              ", configs[c_ind]->wages[i]);
+
       puts("\n");
       return 0;
     }

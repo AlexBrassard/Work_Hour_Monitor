@@ -180,14 +180,14 @@ enum whm_question_type {
   /* When modifing the configuration file. */
   MODIF_COMPANY_NAME,
   MODIF_CONFIG_FIELD,
-  ADD_UNKNOWN_COMPANY,
+  MODIF_UNKNOWN_COMPANY,
   MODIF_POSITION,
-  F_STATUS,
-  F_EMPLOYER,
-  F_POSITION,
-  F_WAGE,
-  F_NIGHT_PRIME,
-  F_HOLIDAY_PAY
+  FIELD_STATUS,
+  FIELD_EMPLOYER,
+  FIELD_POSITION,
+  FIELD_WAGE,
+  FIELD_NIGHT_PRIME,
+  FIELD_HOLIDAY_PAY
 
 };
 
@@ -244,6 +244,13 @@ int            whm_list_config_names(int max_config_ind,   /* List names of acti
 int            whm_list_config_fields(char *company,       /* List a given company's configuration file modifiable entries. */
 				      int max_config_ind,
 				      whm_config_T **configs);
+char*          whm_get_company_name  (char *string,        /* Interactively get a company name to edit with whm_modify_config() */
+				      size_t string_s,
+				      int *max_config_ind,
+				      whm_config_T **configs);
+int            whm_get_field_name    (char *string,        /* Get the whm_config_T field to edit (enum whm_config_field_type). */
+				      int max_config_ind,
+				      whm_config_T **configs);
 
 /* whm_mem_utils.c */
 whm_time_T*    whm_init_time_type  (void);                 /* Allocate memory to a and return a whm_time_T object.         */
@@ -262,7 +269,7 @@ void           whm_free_sheet_type (whm_sheet_T *sheet);   /* Free memory of a p
 whm_option_T*  whm_init_option_type(void);                 /* Allocate memory to a whm_option_T object.                    */
 void           whm_free_option_type(whm_option_T *option); /* Free memory allocated to a whm_option_T object.              */
 
-void whm_PRINT_config(whm_config_T *config);
+void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
 /*** MACROS ***/
 
 /* Remove a trailing newline. */
@@ -277,7 +284,7 @@ void whm_PRINT_config(whm_config_T *config);
     while (string[i] != '\0'){				\
       if (string[i] == SPACE) string[i] = U_SCORE;	\
       ++i;						\
-    }						\
+    }							\
   } while (0);
 
 

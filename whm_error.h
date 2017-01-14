@@ -27,7 +27,8 @@ typedef enum whm_errcodes_type {
   WHM_PATHTOOLONG,
   WHM_INVALIDCOMPANY,
   WHM_ISNOTDIGIT,
-  WHM_INVALIDFIELD
+  WHM_INVALIDFIELD,
+  WHM_COMPANYCREATED
  
 } whm_errcodes_T;
 
@@ -45,7 +46,8 @@ static const char whm_errmesg[][WHM_ERRMESG_MAX_LENGHT] = {
   "New pathname exceed the program's lenght limit",
   "Given company name does not exists",
   "Cannot convert non-digit characters to unsigned integer",
-  "The demanded field does not exists"
+  "The demanded field does not exists",
+  "The desired company has been created a few moments ago."
   
   
 };

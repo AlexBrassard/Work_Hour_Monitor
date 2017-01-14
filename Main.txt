@@ -175,3 +175,30 @@ NOTE: (for _read_sheet maybe?)
   Close all streams, free memory, and exit with success.
 
 }
+
+
+/* Not the ideal place for it but didn't wanna create a file just for it. */
+int whm_inter_modify_config(int max_config_ind,
+    			    whm_config_T **configs)
+
+{
+   /* whm_modify_config(company, position, field, value, max_config_ind, configs) */
+
+   whm_get_company_name()
+   Print a header message.
+   Tell user that 'list' or 'liste' prints a list of all company
+   names in the configuration file.
+   Ask user for the company name of the entry to modify.
+   Verify that the given company has an entry in the configuration file.
+   If there isn't, ask the user to create an entry for it.
+
+   whm_get_field_name()
+   Ask user for the field to modify in the given company's entry,
+   also tell user that 'list' or 'liste' prints a list of all modifiable
+   fields and their respective values for the current company.
+
+   Depending on the chosen field, ask for the revelant value(s).
+
+   Call whm_modify_config() with gathered parameters.
+
+}

@@ -374,7 +374,7 @@ int whm_ask_user(enum whm_question_type question,
     printf("\nQuel entree voulez-vous modifier?\n[Entrer \"list\" pour une liste d'entrees disponible]: ");
     break;
 
-  case ADD_UNKNOWN_COMPANY:
+  case MODIF_UNKNOWN_COMPANY:
     printf("\nLa compagnie demandee n'existe pas,\nvoulez-vous cree une nouvelle entree pour celle-ci? [Oui/Non]: ");
     break;
 
@@ -382,11 +382,11 @@ int whm_ask_user(enum whm_question_type question,
     printf("\nQuel position souhaitez-vous modifier?: ");
     break;
 
-  case F_STATUS:
+  case FIELD_STATUS:
     printf("\nEntrer le nouveau status pour %s [Actif/Inactif]: ", config->employer);
     break;
 
-  case F_POSITION:
+  case FIELD_POSITION:
     printf("\nPour ajouter un nouveau poste, entrer le nom du nouveau\
  poste chez %s,\nsuivi d'une espace et du salaire, par heure, pour celui-ci.\n\n",
 	   config->employer);

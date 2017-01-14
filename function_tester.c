@@ -11,6 +11,7 @@ int main (int argc, char **argv)
   whm_config_T **configs = NULL;
   int index = 0, i = 0;
   FILE *stream = NULL;
+  char company[WHM_NAME_STR_S];
 
   if ((configs = malloc(2 * sizeof(whm_config_T*))) == NULL){
     WHM_ERRMESG("Malloc");
@@ -33,8 +34,12 @@ int main (int argc, char **argv)
   }
   fclose(stream);
   stream = NULL;
-  if (whm_list_config_fields("SLB", index, configs) != 0){
-    WHM_ERRMESG("Whm_list_config_fields");
+  if (whm_get_company_name(company, WHM_NAME_STR_S, &i, configs) == NULL){
+    WHM_ERRMESG("Whm_get_company_name");
+    return -1;
+  }
+  if (whm_get_field_name(company, i, configs) == -1){
+    WHM_ERRMESG("Whm_get_field_name");
     return -1;
   }
     

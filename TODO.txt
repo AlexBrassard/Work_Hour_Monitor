@@ -1,3 +1,3 @@
-1. Add sutils.h to github and create a readme file for it.
+1. Complete whm_inter_modify_config() according to the [short] pseudocode.
 
-2. Review the whole logic of whm_inter_modify_config() 
+2. Review and "modernise" my own pseudocoding rules. (Somewhere in ~/text_files).
