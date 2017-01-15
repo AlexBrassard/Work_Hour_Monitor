@@ -1,0 +1,22 @@
+/*
+ *
+ * Work Hour Monitor  -  Runtime observations.
+ *
+ */
+
+
+15/01/17
+	- Using Harvey_Inox, trying to change the position "operateur", mistakenly
+	  input "Operateur" and inter_modify() returned : Cannot convert non-digit chars to unsigned ints.
+
+	  Solution: No checks were made on "value[0]" to make sure it's not a NULL byte.
+
+
+	- I suspect a race condition in whm_inter_modify_config() or whm_modify_config().
+	  I ran the program (function_tester), company name: Harvey_Inox (the 2nd config entry),
+	  when using the "list" command the program just hangs forever.
+	  Using gdb, I found the hanging starts at strcmp().
+	  When trying to list the fields of SLB (the first config entry) it works perfectly.
+
+	  Solution: "c_ind" wasn't being incremented at each end of loop, hence hanging forever
+	  	    for any company that wasn't at position 0 in the configuration file.

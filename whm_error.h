@@ -28,7 +28,11 @@ typedef enum whm_errcodes_type {
   WHM_INVALIDCOMPANY,
   WHM_ISNOTDIGIT,
   WHM_INVALIDFIELD,
-  WHM_COMPANYCREATED
+  WHM_COMPANYCREATED,
+  WHM_INVALIDSTATUS,
+  WHM_INVALIDPOSITION,
+  WHM_INVALIDWAGE,
+  WHM_MISSINGWAGE
  
 } whm_errcodes_T;
 
@@ -47,7 +51,11 @@ static const char whm_errmesg[][WHM_ERRMESG_MAX_LENGHT] = {
   "Given company name does not exists",
   "Cannot convert non-digit characters to unsigned integer",
   "The demanded field does not exists",
-  "The desired company has been created a few moments ago."
+  "The desired company has been created a few moments ago",
+  "Invalid status, must be \"Actif (1)\" or \"Inactif (0)\"",
+  "The desired position does not exists",
+  "The given wage is invalid",
+  "Missing a wage per hour for the given position name"
   
   
 };

@@ -237,8 +237,10 @@ int            whm_modify_config   (char *company,         /* Update one field o
 				    char *position,
 				    enum whm_config_field_type field,
 				    char *value,
-				    int max_config_ind,
+				    int c_ind,
 				    whm_config_T **configs);
+int            whm_inter_modify_config(int max_config_ind, /* Interactively modify an entry of the configuration file. */
+				       whm_config_T **configs);
 int            whm_list_config_names(int max_config_ind,   /* List names of active companies in the configuration file. */
 				     whm_config_T **configs);
 int            whm_list_config_fields(char *company,       /* List a given company's configuration file modifiable entries. */
@@ -246,7 +248,8 @@ int            whm_list_config_fields(char *company,       /* List a given compa
 				      whm_config_T **configs);
 char*          whm_get_company_name  (char *string,        /* Interactively get a company name to edit with whm_modify_config() */
 				      size_t string_s,
-				      int *max_config_ind,
+				      int *c_ind,
+				      int max_config_ind,
 				      whm_config_T **configs);
 int            whm_get_field_name    (char *string,        /* Get the whm_config_T field to edit (enum whm_config_field_type). */
 				      int max_config_ind,

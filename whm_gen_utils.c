@@ -383,10 +383,23 @@ int whm_ask_user(enum whm_question_type question,
     break;
 
   case FIELD_STATUS:
-    printf("\nEntrer le nouveau status pour %s [Actif/Inactif]: ", config->employer);
+    printf("\nEntrer le nouveau status [Actif/Inactif]: ");
+    break;
+
+  case FIELD_EMPLOYER:
+    printf("\nEntrer le nouveau nom pour la compagnie %s [%d chars max]: ",
+	   config->employer, WHM_NAME_STR_S-1);
+    break;
+
+  case FIELD_WAGE:
+    printf("\nEntrer le nom du poste a modifier suivi d'une espace et du salaire, par heure, pour ce poste: ");
     break;
 
   case FIELD_POSITION:
+    if (!config){
+      errno = EINVAL;
+      goto errjmp;
+    }
     printf("\nPour ajouter un nouveau poste, entrer le nom du nouveau\
  poste chez %s,\nsuivi d'une espace et du salaire, par heure, pour celui-ci.\n\n",
 	   config->employer);
@@ -394,6 +407,14 @@ int whm_ask_user(enum whm_question_type question,
  suivi d'une espace et du nouveau nom pour le poste.\n\n",
 	   config->employer);
     printf("Pour supprimer un poste existant, entrer le nom du poste seulement.\n: ");
+    break;
+
+  case FIELD_NIGHT_PRIME:
+    printf("\n-1 : Aucun quart de nuit.\n 0 : Aucune prime de nuit.\n 0+: Montant de la prime de nuit\n   : ");
+    break;
+
+  case FIELD_HOLIDAY_PAY:
+    printf("\nRecevez-vous votre 4%% de vacance a chaque paie? [0: non/1: oui]: ");
     break;
 
   default:
@@ -406,7 +427,7 @@ int whm_ask_user(enum whm_question_type question,
   while (i < WHM_NUMOF_EOI_STRINGS)
     if (strcmp(answer, WHM_END_OF_INPUT[i++]) == 0)
       return WHM_INPUTDONE;
-  
+  answer[answer_s-1] = '\0';
   return 0;
 
  errjmp:

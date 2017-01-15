@@ -34,12 +34,8 @@ int main (int argc, char **argv)
   }
   fclose(stream);
   stream = NULL;
-  if (whm_get_company_name(company, WHM_NAME_STR_S, &i, configs) == NULL){
-    WHM_ERRMESG("Whm_get_company_name");
-    return -1;
-  }
-  if (whm_get_field_name(company, i, configs) == -1){
-    WHM_ERRMESG("Whm_get_field_name");
+  if (whm_inter_modify_config(index, configs) != 0){
+    WHM_ERRMESG("Whm_inter_modify_config");
     return -1;
   }
     

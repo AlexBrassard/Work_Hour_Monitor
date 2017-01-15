@@ -465,31 +465,21 @@ int whm_write_config(int c_ind,
 } /* whm_write_config() */
 
 
+/* Modify a single field of a single entry in the configuration file. */
 int whm_modify_config(char *company,
 		      char *position,
 		      enum whm_config_field_type field,
 		      char *value,
-		      int max_config_ind,
+		      int c_ind,
 		      whm_config_T **configs)
 {
-  int c_ind = 0, pos_ind = 0;
+  int pos_ind = 0;
   int pos_found = 0, company_found = 0;
   char new_path[WHM_MAX_PATHNAME_S];
   char *temp_string = NULL;
 
-  if (!company || max_config_ind < 0){
+  if (!company || c_ind < 0){
     errno = EINVAL;
-    return -1;
-  }
-
-  /* Make sure company exist. */
-  for (; c_ind < max_config_ind; c_ind++)
-    if (strcmp(configs[c_ind]->employer, company) == 0){
-      company_found = 1;
-      break;
-    }
-  if (!company_found) {
-    errno = WHM_INVALIDCOMPANY;
     return -1;
   }
 
@@ -499,7 +489,7 @@ int whm_modify_config(char *company,
    */
   switch(field){
   case F_STATUS:
-    if (value[0] == 'a' || value[0] == 'A')
+    if (value[0] == 'a' || value[0] == 'A' || value[0] == '1')
       configs[c_ind]->status = 1;
     else 
       configs[c_ind]->status = 0;
@@ -557,7 +547,7 @@ int whm_modify_config(char *company,
       return -1;
     }
     for (; pos_ind < (int)configs[c_ind]->numof_positions; pos_ind++)
-      if (strcmp(configs[c_ind]->positions[pos_ind], position) == 0){
+      if (strcasecmp(configs[c_ind]->positions[pos_ind], position) == 0){
 	pos_found++;
 	break;
       }
@@ -587,6 +577,11 @@ int whm_modify_config(char *company,
 	errno = EINVAL;
 	return -1;
       }
+      /* Return an error for now. Later will ask for the missing wage itself. */
+      else if (value[0] == '\0') {
+	errno = WHM_MISSINGWAGE;
+	return -1;
+      }
       else if (!isdigit(value[0])){
 	errno = WHM_ISNOTDIGIT;
 	return -1;
@@ -604,6 +599,29 @@ int whm_modify_config(char *company,
       configs[c_ind]->numof_positions++;
     }
     break;
+
+  case F_WAGE:
+    if (!position) {
+      errno = EINVAL;
+      return -1;
+    }
+    /* Make sure the given position exist. */
+    for (; pos_ind < (int)configs[c_ind]->numof_positions; pos_ind++)
+      if (strcasecmp(configs[c_ind]->positions[pos_ind], position) == 0){
+	pos_found++;
+	break;
+      }
+    if (!pos_found) {
+      errno = WHM_INVALIDPOSITION;
+      return -1;
+    }
+    if (!isdigit(value[0])){
+      errno = WHM_ISNOTDIGIT;
+      return -1;
+    }
+    configs[c_ind]->wages[pos_ind] = atof(value);
+    break;
+		     	     
 
   case F_NIGHT_PRIME:
     if (!isdigit(value[0]) && value[0] != DOT && value[0] != DASH){
@@ -645,14 +663,15 @@ int whm_modify_config(char *company,
  * not need to be modified and the new company name is stored in string.
  */
 char* whm_get_company_name(char *string, size_t string_s,
-			   int *max_config_ind,
+			   int *c_ind,
+			   int max_config_ind,
 			   whm_config_T **configs)
 {
   char answer[WHM_NAME_STR_S];
-  int c_ind = 0, company_found = 0;
+  int  company_found = 0;
 
   if (!string || !string_s || !max_config_ind
-      || !*max_config_ind || !configs) {
+      || !max_config_ind || !configs) {
     errno = EINVAL;
     return NULL;
   }
@@ -665,7 +684,7 @@ char* whm_get_company_name(char *string, size_t string_s,
       return NULL;
     }
     if (strstr(string, "list") != NULL){
-      if (whm_list_config_names(*max_config_ind, configs) != 0){
+      if (whm_list_config_names(max_config_ind, configs) != 0){
 	WHM_ERRMESG("Whm_list_config_names");
 	return NULL;
       }
@@ -678,8 +697,8 @@ char* whm_get_company_name(char *string, size_t string_s,
    * Verify the given company name exist, 
    * else propose to create an entry for it.  
    */
-  for (c_ind = 0; c_ind < *max_config_ind; c_ind++)
-    if (strcmp(string, configs[c_ind]->employer) == 0){
+  for (*c_ind = 0; *c_ind < max_config_ind; (*c_ind)++)
+    if (strcasecmp(string, configs[*c_ind]->employer) == 0){
       ++company_found;
       break;
     }
@@ -692,7 +711,7 @@ char* whm_get_company_name(char *string, size_t string_s,
     }
     if (answer[0] == 'o' || answer[0] == 'O'
 	|| answer[0] == 'y' || answer[0] == 'Y'){
-      if (whm_add_config(max_config_ind, configs) != 0){
+      if (whm_add_config(&max_config_ind, configs) != 0){
 	WHM_ERRMESG("Whm_add_config");
 	return NULL;
       }
@@ -741,13 +760,169 @@ int whm_get_field_name(char *company,
 } /* whm_get_field_name() */
 
 
-/* Interactively modify one or more entry(ies) from the configuration file. */
+/* Interactively modify one or more entries from the configuration file. */
 int whm_inter_modify_config(int max_config_ind,
 			    whm_config_T **configs)
 {
 
+#define WHM_VALUE_S WHM_NAME_STR_S*2+1
+  char company[WHM_NAME_STR_S], position[WHM_NAME_STR_S], temp[WHM_NAME_STR_S];
+  char value[WHM_VALUE_S]; /* Some values requires 2 names and a space inbetween. */
+  int c_ind = 0, i = 0, value_ind = 0;
+  int field = -1;
+
+  if (!max_config_ind || !configs){
+    errno = EINVAL;
+    return -1;
+  }
+
+  memset(temp, '\0', WHM_NAME_STR_S);
+  puts("\nWork Hour Monitor\nConfiguration file modification\n\n");
   
+  /* Ask user which company to modify. */
+  if (whm_get_company_name(company, WHM_NAME_STR_S,
+			   &c_ind,
+			   max_config_ind,
+			   configs) == NULL){
+    /* Return successfuly if we had to create a new entry for the given name. */
+    if (errno == WHM_COMPANYCREATED) return 0;
+    WHM_ERRMESG("Whm_get_company_name");
+    return -1;
+  }
+
+  /* Ask which field to modify (out of ones allowed to be modified). */
+  if ((field = whm_get_field_name(company, max_config_ind, configs)) == -1){
+    WHM_ERRMESG("Whm_get_field_name");
+    return -1;
+  }
+
+  /* 
+   * Switch on the field asking the remaining
+   * informations (postion name, old/new value etc). 
+   */
+  switch(field){
+  case F_STATUS:
+    if (whm_ask_user(FIELD_STATUS, value,
+		     WHM_VALUE_S, configs[c_ind], 0) == -1){
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    break;
+
+  case F_EMPLOYER:
+    if (whm_ask_user(FIELD_EMPLOYER, value,
+		     WHM_VALUE_S, configs[c_ind], 0) == -1){
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    break;
+    
+  case F_POSITION:
+    /* 
+     * The answer to this question can take 3 forms:
+     * position_name\0                             Delete position name.
+     * old_position_name new_position_name\0       Replace old_position_name by new_position_name.
+     * new_position_name new_wage\0                Add the position new_position_name with wage new_wage.
+     */
+    if (whm_ask_user(FIELD_POSITION, value,
+		     WHM_VALUE_S, configs[c_ind], 0) == -1){
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    /* The first part of value is always the positions name. */
+    for (value_ind = 0; value[value_ind] != '\0'; value_ind++){
+      if (value[value_ind] == SPACE){
+	value_ind++;
+	break;
+      }
+      position[i++] = value[value_ind];
+    }
+    position[i] = '\0';
+    /* 
+     * If the terminating NULL byte hasn't been reached yet, this is 
+     * either the new position name or the wage. Whm_modify_config() 
+     * knows how to differentiate them. 
+     */
+    for (i = 0; value[value_ind] != '\0'; value_ind++)
+      temp[i++] = value[value_ind];
+    if (s_strcpy(value, temp, WHM_VALUE_S) == NULL){
+      WHM_ERRMESG("S_strcpy");
+      return -1;
+    }
+    break;
+    
+  case F_WAGE:
+    if (whm_ask_user(FIELD_WAGE, value,
+		     WHM_VALUE_S,
+		     NULL, 0) == -1){
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    /* 
+     * Whm_modify_config will verify position name is valid,
+     * all there is to be done is to separate the wage and position name.
+     */
+    for(value_ind = 0; value[value_ind] != '\0'; value_ind++){
+      if (value[value_ind] == SPACE) {
+	if (i > 0) {
+	  position[i] = '\0';
+	  break;
+	}
+      }
+      position[i++] = value[value_ind];
+    }
+    
+    for(i = 0; value[value_ind] != '\0'; value_ind++)
+      temp[i++] = value[value_ind];
+    if (i > 0){
+      if (s_strcpy(value, temp, WHM_VALUE_S) == NULL){
+	WHM_ERRMESG("S_strcpy");
+	return -1;
+      }
+    }
+    else{
+      errno = WHM_INVALIDWAGE;
+      return -1;
+    }
+    break;
+
+  case F_NIGHT_PRIME:
+    if (whm_ask_user(FIELD_NIGHT_PRIME, value,
+		     WHM_VALUE_S,
+		     NULL, 0) == -1){
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    break;
+
+  case F_HOLIDAY_PAY:
+    if (whm_ask_user(FIELD_HOLIDAY_PAY, value,
+		     WHM_VALUE_S,
+		     NULL, 0) == -1){
+      WHM_ERRMESG("Whm_ask_user");
+      return -1;
+    }
+    break;
+
+  default:
+    errno = WHM_INVALIDFIELD;
+    return -1;
+  }
+
+  /* Make the call to whm_modify_config() to apply the requested modifications. */
+  if (whm_modify_config(company, position,
+			field, value,
+			c_ind,
+			configs) == -1){
+    WHM_ERRMESG("Whm_modify_config");
+    return -1;
+  }
+
   return 0;
+
+#undef WHM_VALUE_S
+#undef WHM_GET_ONE_VALUE
+#undef WHM_GET_TWO_VALUES
 } /* whm_inter_modify_config() */
 
 
@@ -795,8 +970,8 @@ int whm_list_config_fields(char *company,
 
   while (c_ind < max_config_ind){
     if (!configs[c_ind]) break;
-    if (strcmp(configs[c_ind]->employer, company) == 0){
-      printf("\nWork Hour Monitor\nList of modifiable fields for %s's configuration file entry.\n\n", company);
+    if (strcasecmp(configs[c_ind]->employer, company) == 0){
+      printf("\n\nWork Hour Monitor\nList of modifiable fields for %s's configuration file entry.\n\n\n", company);
 
       printf("0 - %-18s %zu\n1 - %-18s %s\n2 - %-18s ", "Status:", configs[c_ind]->status,
 	     "Employer:", configs[c_ind]->employer,
@@ -807,10 +982,14 @@ int whm_list_config_fields(char *company,
       printf("\n3 - %-18s ", "Position wages:");
       for (i = 0; i < configs[c_ind]->numof_positions; i++)
 	printf("%.2f              ", configs[c_ind]->wages[i]);
+      printf("\n4 - %-18s %s\n5 - %-18s %s\n",
+	     "Night bonus:", configs[c_ind]->night_prime,
+	     "Holiday pay:", (configs[c_ind]->do_pay_holiday > 0) ? "Yes" : "No");
 
       puts("\n");
       return 0;
     }
+    ++c_ind;
   }
   errno = WHM_INVALIDCOMPANY;
   return -1;

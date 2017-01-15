@@ -1,3 +1,3 @@
-1. Complete whm_inter_modify_config() according to the [short] pseudocode.
 
-2. Review and "modernise" my own pseudocoding rules. (Somewhere in ~/text_files).
+
+Optional - Review and "modernise" my own pseudocoding rules. (Somewhere in ~/text_files).

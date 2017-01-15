@@ -4,12 +4,52 @@
  *
  */
 TOP
-Important
+----
+Very Important:
+Note: Careful not to let to much spaces between them:
+    Spaces and underscores should be interchangeable when asking user to
+    input values so that "harvey inox" and "harvey_inox" would both match
+    the same entry.
+    
+
+Very Important:
+Note: I'm leaving! But please don't be mad..:
+    Every time WHM asks its users something, there must be safe escape routes,
+    safe meaning without consequences on the program's existing data.
+    There should be a way to quit the program total, without data lost other than
+    what hasn't been already saved to disk, even in the middle of say modifing the configuration file.
+    At each steps there should be an option to roll back one or more steps
+    in order to modify/overwrite something we've just input.
+
+
+Important:
+Note: Different cases, same problems:
+    Whm_ask_user must not be sensitive to case (upper/lower) when it asks users for
+    input. So "SLB", "Slb", "slb", "sLb", etc are all equivalent.
+
+
+Important:
+Note: Not that twins aren't cool, they're just too confusing:
+    When using any of the _modify_config() functions, an additional check
+    must be made to make sure no company or position name gets duplicated.
+
+
+Note: Options and their arguments:
+    A short option begins by a single dash followed by a single alphabetic character.
+    A long option begins by two dashes followed by one or more alphanumeric characters.
+    Both can take arguments of the form:     arg_name=value    with no spaces in between.
+    An options that can take one or more arguments but which is given none when called
+    on the command line will fall through to it's whm_interac_* function.
+
+    whm_interac_modify_config() and whm_parse_options() are both responsible
+    of validating the company name and finding its index in the whm_config_T* array
+    to correctly feed whm_modify_config().
+
+
 Note: Ignore any comments your hear, but remember all of them just in case:
     Since the configuration file should not be edited by hand,
     the position of commentaries and the comments themselfs should not
     be recorded but it will be very required for operations on hour sheets.
-
 
 
 Note: Install me properly:

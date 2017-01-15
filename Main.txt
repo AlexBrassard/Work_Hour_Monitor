@@ -7,7 +7,6 @@
 
 int whm_automatic_mode(whm_config_T *config)
 {
-  Read each hour sheets found in the main configuration file.
   Backup each hour sheets, keep backup names in an array.
   Use whm_auto_update() on each sheet to prompt the user for the
   number of hours worked for the current day and update the sheet's values.
