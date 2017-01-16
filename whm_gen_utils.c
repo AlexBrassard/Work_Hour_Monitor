@@ -2,7 +2,7 @@
  *
  * Work Hour Monitor  -  General utilities.
  *
- * Version: 1.01
+ * Version: 0.01
  *
  */
 
@@ -215,7 +215,7 @@ int whm_clr_string(whm_queue_T *queue, int index)
 
 char* whm_create_backup(const char *filename, char *backupname)
 {
-  FILE *stream;
+  FILE *stream = NULL, *bstream = NULL;
   char *file_content = NULL;
   
   if (!filename || !backupname){
@@ -248,18 +248,18 @@ char* whm_create_backup(const char *filename, char *backupname)
     WHM_ERRMESG("Fread");
     goto errjmp;
   }
-  fclose(stream);
-  stream = NULL;
-  if ((stream = fopen(backupname, "w")) == NULL){
+  if ((bstream = fopen(backupname, "w")) == NULL){
     WHM_ERRMESG("Fopen");
     goto errjmp;
   }
-  if (fwrite(file_content, strlen(file_content), sizeof(char), stream) == 0){
+  if (fwrite(file_content, strlen(file_content), sizeof(char), bstream) == 0){
     WHM_ERRMESG("Fwrite");
     goto errjmp;
   }
   fclose(stream);
   stream = NULL;
+  fclose(bstream);
+  bstream = NULL;
   /* Make sure the backup is read-only. */
   if (chmod(backupname, 0400) != 0){
     WHM_ERRMESG("Chmod");
@@ -279,6 +279,10 @@ char* whm_create_backup(const char *filename, char *backupname)
   if (stream){
     fclose(stream);
     stream = NULL;
+  }
+  if (bstream){
+    fclose(bstream);
+    bstream = NULL;
   }
   return NULL;
 } /* whm_create_backup() */

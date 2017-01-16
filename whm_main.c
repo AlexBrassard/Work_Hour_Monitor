@@ -20,6 +20,8 @@ int main(int argc, char **argv)
   FILE *stream = NULL;
   whm_config_T **configs = NULL;
   int i = 0, c_ind = 0;
+  char config_bkup_name[WHM_MAX_PATHNAME_S];
+
 
   /* Initialize the array of configuration entries. */
   if ((configs = malloc(WHM_MAX_CONFIG_ENTRIES * sizeof(whm_config_T*))) == NULL){
@@ -49,7 +51,8 @@ int main(int argc, char **argv)
   
   /* 
    * Read or create the configuration file.
-   * In both cases, configs has c_ind-1 number of filled entries.
+   * In both cases, configs has c_ind-1 number of filled entries,
+   * up to WHM_MAX_CONFIG_ENTRIES.
    */
   if ((stream = fopen(WHM_CONFIGURATION_FILE, "r")) == NULL){
     if (whm_new_config(WHM_CONFIGURATION_FILE, &c_ind, configs) != 0) {
@@ -63,7 +66,17 @@ int main(int argc, char **argv)
       goto errjmp;
     }
   }
-    
+
+  /* 
+   * Before making any modifications to the configuration file, do a backup. 
+   * This backup is removed only when the configuration file is written to disk.
+   */
+  if (whm_create_backup(WHM_CONFIGURATION_FILE,
+			config_bkup_name) == NULL){
+    WHM_ERRMESG("Whm_create_backup");
+    goto errjmp;
+  }
+
   if (argc > 1){ /* There might be options. */
     /* Use whm_parse_options() to execute options. */
     ;
@@ -71,8 +84,19 @@ int main(int argc, char **argv)
   /* If the program hasn't terminated yet, execute the automatic mode as well. */
   
 
-  /* Now that modifications are completed, write the hour sheets to disk. */
-  
+  /* Before exiting, write the configuration file to disk. */
+  if (whm_write_config(c_ind,
+		       WHM_CONFIGURATION_FILE,
+		       configs) == -1) {
+    WHM_ERRMESG("Whm_write_config");
+    goto errjmp;
+  }
+
+  /* Remove the configuration file's backup file. */
+  if (whm_delete_backup(config_bkup_name) != 0){
+    WHM_ERRMESG("Whm_remove_backup");
+    goto errjmp;
+  }
   
   /* Cleanup before exit. */
   if (configs){

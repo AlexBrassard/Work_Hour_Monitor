@@ -2,7 +2,7 @@
  *
  * Work Hour Monitor  -  Configuration related functions.
  *
- * Version: 1.01
+ * Version: 0.01
  *
  */
 #include <stdio.h>
@@ -269,16 +269,139 @@ int whm_add_config(int *c_ind,                   /* Index of the first free elem
 } /* whm_add_config() */
 
 
+/* Fill a whm_config_T object with relevant data. */
+int whm_get_config_entry(whm_config_T *config,
+			 FILE *stream)
+{
+  size_t line_c_ind = 0, word_c_ind = 0, pos_ind = 0;
+  char line[WHM_LINE_BUFFER_S], word[WHM_NAME_STR_S];
+  int line_count = 0;
+  
+  if (!stream) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  for (line_count = 0; line_count < 8; line_count++){
+    memset(line, '\0', WHM_LINE_BUFFER_S);
+    memset(word, '\0', WHM_NAME_STR_S);
+    pos_ind = 0;
+
+    /* Read a line then parse it. */
+    errno = 0;
+    if (fgets(line, WHM_LINE_BUFFER_S, stream) == NULL) {
+      if (feof(stream)) return 1;
+      else if (errno || ferror(stream)){
+	WHM_ERRMESG("Fgets");
+	goto errjmp;
+      }
+    }
+
+    /* Substract 1 cause line_count gets incremented every end of loop. */
+    if (line[0] == NEWLINE) {
+      --line_count;
+      continue;
+    }
+    else WHM_TRIM_NEWLINE(line);
+
+    /* 
+     * Only check if config isn't NULL here so we can detect 
+     * EOF even when config is in fact NULL. 
+     */
+    if (!config) {
+      errno = EINVAL;
+      return -1;
+    }
+
+    /* Populate the whm_config_T object's fields, depending the line we're at. */
+    switch(line_count){
+    case 0:
+      config->status = atoi(line);
+      break;
+
+    case 1:
+      WHM_REPLACE_SPACE(line);
+      if (s_strcpy(config->employer, line, WHM_NAME_STR_S) == NULL){
+	WHM_ERRMESG("S_strcpy");
+	goto errjmp;
+      }
+      break;
+
+    case 2:
+      if (s_strcpy(config->working_directory,
+		   line, WHM_LINE_BUFFER_S) == NULL){
+	WHM_ERRMESG("S_strcpy");
+	goto errjmp;
+      }
+      break;
+
+    case 3:
+      config->numof_positions = atoi(line);
+      break;
+
+    case 4:
+      for (line_c_ind = 0; line_c_ind < WHM_LINE_BUFFER_S; line_c_ind++){
+	if (line[line_c_ind] == SPACE || line[line_c_ind] == '\0') {
+	  word[word_c_ind] = '\0';
+	  if (s_strcpy(config->positions[pos_ind++], word, WHM_NAME_STR_S) == NULL){
+	    WHM_ERRMESG("S_strcpy");
+	    goto errjmp;
+	  }
+	  word_c_ind = 0;
+	  if (line[line_c_ind] == '\0' || line[line_c_ind+1] == '\0') break;
+	  memset(word, '\0', WHM_NAME_STR_S);
+	  continue;
+	}
+	word[word_c_ind++] = line[line_c_ind];
+      }
+      break;
+
+    case 5:
+      for (line_c_ind = 0; line_c_ind < WHM_LINE_BUFFER_S; line_c_ind++){
+	if (line[line_c_ind] == SPACE || line[line_c_ind] == '\0') {
+	  config->wages[pos_ind++] = atof(word);
+	  word_c_ind = 0;
+	  if (line[line_c_ind] == '\0' || line[line_c_ind+1] == '\0') break;
+	  memset(word, '\0', WHM_NAME_STR_S);
+	  continue;
+	}
+	word[word_c_ind++] = line[line_c_ind];
+      }
+      break;
+
+    case 6:
+      if (s_strcpy(config->night_prime, line, WHM_NAME_STR_S) == NULL){
+	WHM_ERRMESG("S_strcpy");
+	goto errjmp;
+      }
+      break;
+
+    case 7:
+      config->do_pay_holiday = atoi(line);
+      break;
+
+    default:
+      errno = WHM_INVALIDELEMCOUNT;
+      goto errjmp;
+    }
+  }
+
+  return 0;
+
+ errjmp:
+  return -1;
+} /* whm_get_config_entry() */
+  
+
+
 /* Read and parse the configuration file. */
 int  whm_read_config(FILE *stream,
 		     int *c_ind,
 		     whm_config_T **configs)
 {
-  size_t line_c_ind = 0, word_c_ind = 0, pos_ind = 0;
-  char line[WHM_LINE_BUFFER_S], word[WHM_NAME_STR_S];
   long config_offset = 0;
   size_t header_len = strlen(WHM_CONFIG_HEADER_MSG);
-  int line_count = 0;
+  int ret = 0;
   
   if (!stream || !c_ind || !configs){
     errno = EINVAL;
@@ -288,135 +411,38 @@ int  whm_read_config(FILE *stream,
    * Place the file position indicator at the next
    * character after the configuration file header message.
    */
-  if (header_len+1 < LONG_MAX) config_offset = (long)header_len+1;
+  if (header_len < LONG_MAX) config_offset = (long)header_len;
   else config_offset = LONG_MAX-1;
   if (fseek(stream, config_offset, SEEK_SET) == -1){
     WHM_ERRMESG("Fseek");
-    goto errjmp;
+    return -1;
   }
   
   /*
-   * The configuration file must be read one line at a time,
-   * incrementing *c_ind everytime the line count reaches exactly '7'
-   * Most of the times, the loop will exit early at 'goto end_of_loop'.
-   * Configuration file line numbers and content:
-   * 0 - Status
-   * 1 - Employer name
-   * 2 - Working directory
-   * 3 - Number of occupied positions
-   * 4 - Positions names
-   * 5 - Wages for each positions
-   * 6 - Night bonus
-   * 7 - 4% paid each pay
+   * Fill each whm_config_T objects with the information found in
+   * the configuration file. whm_get_config_entry will return
+   * 0 after an entry has been filled, and exactly 1 when reached EOF.
    */
 
   for (*c_ind = 0; *c_ind < WHM_MAX_CONFIG_ENTRIES; (*c_ind)++){
-    for (line_count = 0; line_count < 8; line_count++){
-      memset(line, '\0', WHM_LINE_BUFFER_S);
-      memset(word, '\0', WHM_NAME_STR_S);
-      pos_ind = 0;
-      
-      /* Read a line then parse it. */
-      errno = 0;
-      if (fgets(line, WHM_LINE_BUFFER_S, stream) == NULL) {
-	if (feof(stream)) goto end_of_loop;
-	else if (errno || ferror(stream)){
-	  WHM_ERRMESG("Fgets");
-	  goto errjmp;
-	}
-      }
-      
-      /* Substract 1 cause line_count gets incremented every end of loop. */
-      if (line[0] == NEWLINE) {
-	--line_count;
-	continue;
-      }
-      WHM_TRIM_NEWLINE(line);
-
-      /* Populate the whm_config_T object's fields, depending the line we're at. */
-      switch(line_count){
-      case 0:
-	configs[*c_ind]->status = atoi(line);
-	break;
-
-      case 1:
-	WHM_REPLACE_SPACE(line);
-	if (s_strcpy(configs[*c_ind]->employer, line, WHM_NAME_STR_S) == NULL){
-	  WHM_ERRMESG("S_strcpy");
-	  goto errjmp;
-	}
-	break;
-
-      case 2:
-	if (s_strcpy(configs[*c_ind]->working_directory,
-		     line, WHM_LINE_BUFFER_S) == NULL){
-	  WHM_ERRMESG("S_strcpy");
-	  goto errjmp;
-	}
-	break;
-
-      case 3:
-	configs[*c_ind]->numof_positions = atoi(line);
-	break;
-
-      case 4:
-	for (line_c_ind = 0; line_c_ind < WHM_LINE_BUFFER_S; line_c_ind++){
-	  if (line[line_c_ind] == SPACE || line[line_c_ind] == '\0') {
-	    word[word_c_ind] = '\0';
-	    if (s_strcpy(configs[*c_ind]->positions[pos_ind++], word, WHM_NAME_STR_S) == NULL){
-	      WHM_ERRMESG("S_strcpy");
-	      goto errjmp;
-	    }
-	    word_c_ind = 0;
-	    if (line[line_c_ind] == '\0') break;
-	    memset(word, '\0', WHM_NAME_STR_S);
-	    continue;
-	  }
-	  word[word_c_ind++] = line[line_c_ind];
-	}
-	break;
-
-      case 5:
-	for (line_c_ind = 0; line_c_ind < WHM_LINE_BUFFER_S; line_c_ind++){
-	  if (line[line_c_ind] == SPACE || line[line_c_ind] == '\0') {
-	    configs[*c_ind]->wages[pos_ind++] = atof(word);
-	    word_c_ind = 0;
-	    if (line[line_c_ind] == '\0') break;
-	    memset(word, '\0', WHM_NAME_STR_S);
-	    continue;
-	  }
-	  word[word_c_ind++] = line[line_c_ind];
-	}
-	break;
-	
-      case 6:
-	if (s_strcpy(configs[*c_ind]->night_prime, line, WHM_NAME_STR_S) == NULL){
-	  WHM_ERRMESG("S_strcpy");
-	  goto errjmp;
-	}
-	break;
-
-      case 7:
-	configs[*c_ind]->do_pay_holiday = atoi(line);
-	break;
-
-      default:
-	errno = WHM_INVALIDELEMCOUNT;
-	goto errjmp;
-      }
+    if ((ret = whm_get_config_entry(configs[*c_ind], stream)) == -1){
+      WHM_ERRMESG("Whm_get_config_entry");
+      return -1;
     }
+    else if (ret == 1) break;
   }
- end_of_loop:
+
   return 0;
 
- errjmp:
-  return -1;
 } /* whm_read_config() */
 
 
-/* Write to disk all informations found in the whm_config_T* array. */
+/*
+ * Write to disk all informations found in the whm_config_T* array. 
+ * c_ind is 1 more than the last element of configs.
+ */
 int whm_write_config(int c_ind,
-		     char *config_path,
+		     const char *config_path,
 		     whm_config_T **configs)
 {
   if (!c_ind || !config_path || !configs) {
@@ -547,7 +573,7 @@ int whm_modify_config(char *company,
       return -1;
     }
     for (; pos_ind < (int)configs[c_ind]->numof_positions; pos_ind++)
-      if (strcasecmp(configs[c_ind]->positions[pos_ind], position) == 0){
+      if (s_strcmp(configs[c_ind]->positions[pos_ind], position, WHM_NAME_STR_S, LS_ICASE) == 0){
 	pos_found++;
 	break;
       }
@@ -607,7 +633,7 @@ int whm_modify_config(char *company,
     }
     /* Make sure the given position exist. */
     for (; pos_ind < (int)configs[c_ind]->numof_positions; pos_ind++)
-      if (strcasecmp(configs[c_ind]->positions[pos_ind], position) == 0){
+      if (s_strcmp(configs[c_ind]->positions[pos_ind], position, WHM_NAME_STR_S, LS_ICASE) == 0){
 	pos_found++;
 	break;
       }
@@ -698,7 +724,7 @@ char* whm_get_company_name(char *string, size_t string_s,
    * else propose to create an entry for it.  
    */
   for (*c_ind = 0; *c_ind < max_config_ind; (*c_ind)++)
-    if (strcasecmp(string, configs[*c_ind]->employer) == 0){
+    if (s_strcmp(string, configs[*c_ind]->employer, WHM_NAME_STR_S, LS_ICASE) == 0){
       ++company_found;
       break;
     }
@@ -970,7 +996,7 @@ int whm_list_config_fields(char *company,
 
   while (c_ind < max_config_ind){
     if (!configs[c_ind]) break;
-    if (strcasecmp(configs[c_ind]->employer, company) == 0){
+    if (s_strcmp(configs[c_ind]->employer, company, WHM_NAME_STR_S, LS_ICASE) == 0){
       printf("\n\nWork Hour Monitor\nList of modifiable fields for %s's configuration file entry.\n\n\n", company);
 
       printf("0 - %-18s %zu\n1 - %-18s %s\n2 - %-18s ", "Status:", configs[c_ind]->status,
@@ -996,3 +1022,47 @@ int whm_list_config_fields(char *company,
 } /* whm_list_config_fields() */
   
 
+/* 
+ * Delete the given company name and all related informations from 
+ * the configuration file.
+ * This will NOT remove the company's directory and hours sheets.
+ * A user must do this manualy.
+ */
+int whm_delete_config(char *company,
+		      int *max_config_ind,
+		      whm_config_T **configs)
+{
+  int c_ind = 0;
+  size_t i = 0;
+  whm_config_T *temp = NULL;
+
+  if (!company || !max_config_ind || !*max_config_ind || !configs){
+    errno = EINVAL;
+    return -1;
+  }
+  
+  while (c_ind < *max_config_ind) {
+    if (s_strcmp(company, configs[c_ind]->employer, WHM_NAME_STR_S, LS_ICASE) == 0){
+      /* Move the matched entry to the end of the array. */
+      temp = configs[c_ind];
+      while (c_ind+1 < *max_config_ind) {
+	configs[c_ind] = configs[c_ind+1];
+	++c_ind;
+      }
+      configs[++c_ind] = temp;
+      /* Overwrite some information that could be sensitive. */
+      memset(configs[c_ind]->employer, '\0', WHM_NAME_STR_S);
+      memset(configs[c_ind]->working_directory, '\0', WHM_MAX_PATHNAME_S);
+      for (i = 0; i < configs[c_ind]->numof_positions; i++){
+	memset(configs[c_ind]->positions[i], '\0', WHM_NAME_STR_S);
+	configs[c_ind]->wages[i] = 0;
+      }
+      configs[c_ind] = NULL;
+      --(*max_config_ind);
+      return 0;
+    }
+    ++c_ind;
+  }
+  errno = WHM_INVALIDCOMPANY;
+  return -1;
+} /* whm_delete_config() */

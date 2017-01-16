@@ -2,7 +2,7 @@
  *
  * Work Hour Monitor  -  Error codes, messages and MACRO.
  *
- * Version: 1.01
+ * Version: 0.01
  *
  */
 

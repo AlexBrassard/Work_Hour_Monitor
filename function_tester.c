@@ -11,8 +11,13 @@ int main (int argc, char **argv)
   whm_config_T **configs = NULL;
   int index = 0, i = 0;
   FILE *stream = NULL;
-  char company[WHM_NAME_STR_S];
+  whm_time_T *time_o = NULL;
+  char pathname[WHM_MAX_PATHNAME_S];
 
+  if ((time_o = whm_init_time_type()) == NULL){
+    WHM_ERRMESG("Whm_init_time_type");
+    return -1;
+  }
   if ((configs = malloc(2 * sizeof(whm_config_T*))) == NULL){
     WHM_ERRMESG("Malloc");
     return -1;
@@ -24,7 +29,7 @@ int main (int argc, char **argv)
     }
 
 
-  if ((stream = fopen("/home/lappop/Main_config_template.txt", "r")) == NULL){
+  if ((stream = fopen(WHM_CONFIGURATION_FILE, "r")) == NULL){
     WHM_ERRMESG("Fopen");
     return -1;
   }
@@ -34,10 +39,13 @@ int main (int argc, char **argv)
   }
   fclose(stream);
   stream = NULL;
-  if (whm_inter_modify_config(index, configs) != 0){
-    WHM_ERRMESG("Whm_inter_modify_config");
+  if (whm_get_time(time_o) == -1){
+    WHM_ERRMESG("Whm_get_time");
     return -1;
   }
+  for (i = 0; i < 2; i++)
+    printf("\nThis sheet's path: %s\n",
+	   whm_make_sheet_path(pathname, time_o, configs[i]));
     
   
   return 0;

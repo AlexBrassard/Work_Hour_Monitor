@@ -11,8 +11,8 @@ P------  Pseudocoded
 --M----  MACRO
 ---I---  Inline
 ----O--  Obsolete
------A-  Actively working on it
-------T	 Called via command line option
+-----T-  Called via command line option
+------A	 Actively working on it
 
 STATUS	  NAME			     FILE		   DESCRIPTION
 
@@ -40,6 +40,7 @@ P------	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_new_dir	 	     whm_gen_utils.c       Create a new directory.
 -C-----	  whm_get_time		     whm_gen_utils.c	   Populate a whm_typeime_T* object.
 -C-----	  whm_clr_time		     whm_gen_utils.c	   Cleanup a whm_typeime_T* object.
+-------	  whm_find_first_dom	     whm_gen_utils.c	   Find what's the first weekday of the current month.
 -C-----	  whm_get_string	     whm_gen_utils.c	   Get a string from the given queue.
 -C-----	  whm_set_string	     whm_gen_utils.c	   Save a string in the given queue.
 -C-----	  whm_clr_string	     whm_gen_utils.c	   Clean all values in the given queue.
@@ -48,24 +49,31 @@ P------	  main			     whm_main.c		   Work Hour Monitor.
 -------	  whm_cmp_names		     whm_gen_utils.c	   Compare a string against ->name fields of a whm_sheet_T* array.
 -C-----	  whm_ask_user		     whm_gen_utils.c	   Ask the user via stdin the requested information.
 
--C----T	  whm_add_config	     whm_config.c	   Add a company to an existing configuration file.
-------T	  whm_del_config	     whm_config.c	   Delete a company from an existing configuration file.
--C----T   whm_modify_config	     whm_config.c	   Modify an existing entry in an existing configuration file.
-P----AT	  whm_inter_modify_config    whm_config.c          Interactive wrapper arround whm_modify_config.
+-C---T-	  whm_add_config	     whm_config.c	   Add a company to an existing configuration file.
+-C---T-	  whm_del_config	     whm_config.c	   Delete a company from an existing configuration file.
+-C---T-   whm_modify_config	     whm_config.c	   Modify an existing entry in an existing configuration file.
+PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper arround whm_modify_config.
 -C-----	  whm_new_config	     whm_config.c	   Create a new configuration file.
 -C-----	  whm_read_config	     whm_config.c	   Read the configuration file.
+-C-----	  whm_get_config_entry	     whm_config.c	   Fill a whm_config_T object with relevant data.
 -C-----	  whm_write_config	     whm_config.c	   Write an updated configuration file.
--C----T	  whm_list_config_names	     whm_config.c	   Print a list of company name in the configuration file to stdout.
--C----T	  whm_list_config_fields     whm_config.c	   Print a list of a company's modifiable configuration file fields.
+-C---T-	  whm_list_config_names	     whm_config.c	   Print a list of company name in the configuration file to stdout.
+-C---T-	  whm_list_config_fields     whm_config.c	   Print a list of a company's modifiable configuration file fields.
 -C-----   whm_get_company_name	     whm_config.c	   Interactively get a company name to be edited by whm_modify_config().
 -C-----   whm_get_field_name	     whm_config.c	   Interactively get a field name to be edited by whm_modify_config().
 
-------T	  whm_new_sheet		     whm_sheet.c	   Create a new, empty hour sheet.
+-----TA	  whm_new_sheet		     whm_sheet.c	   Create a new, empty hour sheet.
+-------	  whm_print_sheet_head       whm_sheet.c	   Print a header message into a new hour sheet.
+-------	  whm_print_sheet_cal        whm_sheet.c	   Print the calendar part of an hour sheet.
+-------	  whm_print_sheet_cumul	     whm_sheet.c	   Print the cumulatives part of an hour sheet.
 -------	  whm_read_sheet	     whm_sheet.c	   Read an existing hour sheet.
 -------	  whm_write_sheet	     whm_sheet.c	   Write an updated hour sheet.
-------T	  whm_print_sheet	     whm_sheet.c	   Print an hour sheet to stdout.
-------T	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet.
-------T	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
+-C-----	  whm_make_sheet_path	     whm_sheet.c	   Build a new sheet's absolute pathname.
+------A	  whm_new_year_dir	     whm_sheet.c	   Check existance or create a yearly sheet directory for a given company.
+-----T-	  whm_delete_sheet	     whm_sheet.c	   Delete an existing hour sheet.
+-----T-	  whm_print_sheet	     whm_sheet.c	   Print an hour sheet to stdout.
+-----T-	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet.
+-----T-	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
 
 -CM----	  WHM_TRIM_NEWLINE	     whm.h		   Trim a trailing newline from a given string.
 -CM----	  WHM_REPLACE_SPACE	     whm.h		   Replace a space character by an underscore.

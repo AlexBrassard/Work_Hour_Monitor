@@ -18,16 +18,6 @@
 
 /*** Code ***/
 
-
-
-/*
- * At least s_strcpy and s_strcmp are still vulnerable to
- * being fed one or more non-NULL terminated strings.
- * This must be fixed ASAP.
- */
-
-
-
 /*
  * Copy at most dest_s-1 char from src to dest,
  * filling the buffer with zeros before copying the data.
@@ -63,7 +53,7 @@ static inline char* s_strcpy(char *dest, char *src, size_t dest_s)
  * The only way to see if s_strcmp had an error is to verify errno 
  * after each calls.
  */
-int s_strcmp(const char *s1, const char *s2, size_t num, int flags)
+static inline int s_strcmp(const char *s1, const char *s2, size_t num, int flags)
 {
   size_t len1 = 0, len2 = 0;
   errno = 0;
@@ -73,7 +63,7 @@ int s_strcmp(const char *s1, const char *s2, size_t num, int flags)
   }
   /* 
    * Make sure both string lenghts are bigger than or equal to num.
-   * If any strings are smaller than num, modify num so that it's 
+   * If any strings are smaller than num, modify num localy so that it's 
    * equal to the lenght of the smaller string.
    */
   if (num > (len1 = strlen(s1)) || num > (len2 = strlen(s2))){
@@ -129,8 +119,7 @@ static inline char** s_split(char **dest, const char* src, size_t dest_s,
      * destination array and the next word is NULL. 
      */
     if (!dest[dest_ind]){
-      if (dest_ind > 0)
-	break;
+      if (dest_ind > 0) break;
       else{
 	errno = ENODATA;
 	fprintf(stderr, "%s: dest must contain at least one initialized char array.\n\n", __func__);

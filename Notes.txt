@@ -23,12 +23,6 @@ Note: I'm leaving! But please don't be mad..:
 
 
 Important:
-Note: Different cases, same problems:
-    Whm_ask_user must not be sensitive to case (upper/lower) when it asks users for
-    input. So "SLB", "Slb", "slb", "sLb", etc are all equivalent.
-
-
-Important:
 Note: Not that twins aren't cool, they're just too confusing:
     When using any of the _modify_config() functions, an additional check
     must be made to make sure no company or position name gets duplicated.
@@ -111,3 +105,13 @@ The idea:
     company in the configuration file.
     WHM should expect that the number of parameters that influence a salary
     can vary and it should be built so it's easy to add/remove any.
+
+
+/******************************************* Completed **********************************************/
+
+[Done: Created s_strcmp within Libsafeutils, that has a flag for this.]
+Important:
+Note: Different cases, same problems:
+    Whm_ask_user must not be sensitive to case (upper/lower) when it asks users for
+    input. So "SLB", "Slb", "slb", "sLb", etc are all equivalent.
+

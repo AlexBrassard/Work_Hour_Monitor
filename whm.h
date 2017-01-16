@@ -2,7 +2,7 @@
  *
  * Work Hour Monitor  -  Main header file.
  *
- * Version: 1.001
+ * Version: 0.01
  *
  */
 
@@ -51,6 +51,9 @@
 /* Suffix appended to every newly created backup file. */
 static const char WHM_BKUP_SUFFIX[]      = ".whmbkup";
 
+/* Suffix appended to every newly created hour sheet. */
+static const char WHM_SHEET_SUFFIX[]     = ".sheet";
+
 /* Every supported short options. */
 static const char WHM_SHORT_OPTIONS[][3] = {"-p", "-u", "-a", "-d", "-m", "-l", "-h" };
 
@@ -77,6 +80,15 @@ static const char WHM_CONFIG_HEADER_MSG[] =
 static const char WHM_END_OF_INPUT[WHM_NUMOF_EOI_STRINGS][WHM_NAME_STR_S] = {
   "d", "done", "DONE", "e", "exit", "EXIT", "f", "fin", "FIN"
 };
+
+/* Names of each months of the year, in french. */
+static const char WHM_FR_MONTHS[][WHM_NAME_STR_S] = {
+  "Janvier", "Fevrier",  "Mars",
+  "Avril",   "Mai",      "Juin",
+  "Juillet", "Aout",     "Septembre",
+  "Octobre", "Novembre", "Decembre"
+};
+
 
 /*** Data types ***/
 
@@ -203,6 +215,23 @@ enum whm_config_field_type {
 
 /*** Prototypes ***/
 
+/* whm_mem_utils.c */
+whm_time_T*    whm_init_time_type  (void);                 /* Allocate memory to a and return a whm_time_T object.         */
+void           whm_free_time_type  (whm_time_T *time_o);   /* Free memory of a previously initialized whm_time_T object.   */
+whm_queue_T*   whm_init_queue_type (int top_index,         /* Allocate memory to a whm_queue_T object.                     */
+				    size_t elem_size);
+void           whm_free_queue_type (whm_queue_T *queue);   /* Free memory of a previously initialized whm_queue_T object.  */ 
+whm_config_T*  whm_init_config_type(void);                 /* Allocate memory for a whm_config_T object.                   */
+void           whm_free_config_type(whm_config_T *config); /* Free memory of a previously initialized whm_config_T object. */
+whm_day_T*     whm_init_day_type   (void);                 /* Allocate memory to a whm_day_T object.                       */
+void           whm_free_day_type   (whm_day_T *day);       /* Free memory of a previously initialized whm_day_T object.    */
+whm_week_T*    whm_init_week_type  (void);                 /* Allocate memory to a whm_week_T object.                      */
+void           whm_free_week_type  (whm_week_T *week);     /* Free memory of a previously initialized whm_week_T object.   */
+whm_sheet_T*   whm_init_sheet_type (void);                 /* Allocate memory to a whm_sheet_T object.                     */
+void           whm_free_sheet_type (whm_sheet_T *sheet);   /* Free memory of a previously initialized whm_sheet_T object.  */
+whm_option_T*  whm_init_option_type(void);                 /* Allocate memory to a whm_option_T object.                    */
+void           whm_free_option_type(whm_option_T *option); /* Free memory allocated to a whm_option_T object.              */
+
 /* whm_gen_utils.c */
 int            whm_new_dir         (const char *dir_name); /* Create a new directory if it doesn't already exists.         */
 int            whm_get_time        (whm_time_T *time_o);   /* Get the current date in a preinitialized whm_time_T object.  */
@@ -227,11 +256,14 @@ int            whm_new_config      (const char *pathname,  /* Create a new confi
 				    whm_config_T **configs);
 int            whm_add_config      (int *config_index,     /* Add a company to the configuration file.                     */
 				    whm_config_T **configs);
+int            whm_delete_config   (char *company,         /* Delete the given company from the configuration file.        */
+				    int *max_config_ind,
+				    whm_config_T **configs);
 int            whm_read_config     (FILE *stream,          /* Read the configuration file. */
 				    int *c_ind,
 				    whm_config_T **configs);
 int            whm_write_config    (int c_ind,             /* Write the configuration file to disk. */
-				    char *config_path,
+				    const char *config_path,
 				    whm_config_T **configs);
 int            whm_modify_config   (char *company,         /* Update one field of the given whm_config_T struct array. */
 				    char *position,
@@ -255,22 +287,11 @@ int            whm_get_field_name    (char *string,        /* Get the whm_config
 				      int max_config_ind,
 				      whm_config_T **configs);
 
-/* whm_mem_utils.c */
-whm_time_T*    whm_init_time_type  (void);                 /* Allocate memory to a and return a whm_time_T object.         */
-void           whm_free_time_type  (whm_time_T *time_o);   /* Free memory of a previously initialized whm_time_T object.   */
-whm_queue_T*   whm_init_queue_type (int top_index,         /* Allocate memory to a whm_queue_T object.                     */
-				    size_t elem_size);
-void           whm_free_queue_type (whm_queue_T *queue);   /* Free memory of a previously initialized whm_queue_T object.  */ 
-whm_config_T*  whm_init_config_type(void);                 /* Allocate memory for a whm_config_T object.                   */
-void           whm_free_config_type(whm_config_T *config); /* Free memory of a previously initialized whm_config_T object. */
-whm_day_T*     whm_init_day_type   (void);                 /* Allocate memory to a whm_day_T object.                       */
-void           whm_free_day_type   (whm_day_T *day);       /* Free memory of a previously initialized whm_day_T object.    */
-whm_week_T*    whm_init_week_type  (void);                 /* Allocate memory to a whm_week_T object.                      */
-void           whm_free_week_type  (whm_week_T *week);     /* Free memory of a previously initialized whm_week_T object.   */
-whm_sheet_T*   whm_init_sheet_type (void);                 /* Allocate memory to a whm_sheet_T object.                     */
-void           whm_free_sheet_type (whm_sheet_T *sheet);   /* Free memory of a previously initialized whm_sheet_T object.  */
-whm_option_T*  whm_init_option_type(void);                 /* Allocate memory to a whm_option_T object.                    */
-void           whm_free_option_type(whm_option_T *option); /* Free memory allocated to a whm_option_T object.              */
+/* whm_sheet.c   */
+char*          whm_make_sheet_path   (char *filename,      /* Build an absolute pathname of the given company's latest sheet. */
+				      whm_time_T *time_o,
+				      whm_config_T *config);
+
 
 void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
 /*** MACROS ***/
