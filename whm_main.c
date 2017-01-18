@@ -19,6 +19,7 @@ int main(int argc, char **argv)
 {
   FILE *stream = NULL;
   whm_config_T **configs = NULL;
+  whm_time_T *time_o = NULL;
   int i = 0, c_ind = 0;
   char config_bkup_name[WHM_MAX_PATHNAME_S];
 
@@ -33,6 +34,15 @@ int main(int argc, char **argv)
       WHM_ERRMESG("Whm_init_config_type");
       goto errjmp;
     }
+  /* Initialize and fill the whm_time_T time object. */
+  if ((time_o = whm_init_time_type()) == NULL){
+    WHM_ERRMESG("Whm_init_time_type");
+    goto errjmp;
+  }
+  if (whm_get_time(time_o) != 0){
+    WHM_ERRMESG("Whm_get_time");
+    goto errjmp;
+  }
 
   /* 
    * WHM_WORKING_DIRECTORY and WHM_CONFIGURATION_FILE are in whm.h 
@@ -55,6 +65,7 @@ int main(int argc, char **argv)
    * up to WHM_MAX_CONFIG_ENTRIES.
    */
   if ((stream = fopen(WHM_CONFIGURATION_FILE, "r")) == NULL){
+  new_config:
     if (whm_new_config(WHM_CONFIGURATION_FILE, &c_ind, configs) != 0) {
       WHM_ERRMESG("Whm_new_config");
       goto errjmp;
@@ -66,7 +77,28 @@ int main(int argc, char **argv)
       goto errjmp;
     }
   }
+  fclose(stream);
+  stream = NULL;
+  /* 
+   * If nothing was found in the configuration file,
+   * warn the user that we're going to recreate it.
+   */
+  if (!c_ind) {
+    fprintf(stderr, "%s: Warning, configuration file exists but contains no entries. Recreating it now\n\n",
+	    WHM_PROGRAM_NAME);
+    if (remove(WHM_CONFIGURATION_FILE) != 0){
+      WHM_ERRMESG("Remove");
+      goto errjmp;
+    }
+    goto new_config;
+  }
 
+  /* Make sure this year directory exists for each entries of the config file. */
+  for (i = 0; i < c_ind; i++)
+    if (whm_new_year_dir(configs[i], time_o) != 0) {
+      WHM_ERRMESG("Whm_new_year_dir");
+      goto errjmp;
+    }
   /* 
    * Before making any modifications to the configuration file, do a backup. 
    * This backup is removed only when the configuration file is written to disk.
@@ -108,6 +140,10 @@ int main(int argc, char **argv)
     free(configs);
     configs = NULL;
   }
+  if (time_o){
+    whm_free_time_type(time_o);
+    time_o = NULL;
+  }
 
   return 0;
 
@@ -124,6 +160,10 @@ int main(int argc, char **argv)
       }
     free(configs);
     configs = NULL;
+  }
+  if (time_o){
+    whm_free_time_type(time_o);
+    time_o = NULL;
   }
 
   

@@ -14,7 +14,16 @@
 # include <ctype.h>
 # include <errno.h>
 
-# define LS_ICASE 1
+# define SPACE  ' '
+# define USCORE '_'
+
+/* s_strcmp flags. */
+enum ls_cmp_flags {
+  LS_ICASE  = 0x01,          /* Case insensitive comparaison. */
+  LS_USPACE = 0x02,          /* Spaces and underscores are treated the same. */
+  LS_STRSTR = 0x04           /* s_strcmp behave more closely like the standard strstr(). */
+
+}; 
 
 /*** Code ***/
 
@@ -46,50 +55,55 @@ static inline char* s_strcpy(char *dest, char *src, size_t dest_s)
 /* 
  * Compares the first num bytes of s1 and s2 returning
  * an integer less than, equal to or bigger than 0 if 
- * s1 is found to be smaller than, equal of or bigger than s2.
- * Flags are optional parameters to pass to s_strcmp, right now only
- * LS_ICASE is available. when this flags is on the comparaisons are
- * case insensitives.
+ * s1 is found to be smaller than, equal to or bigger than s2.
+ *
+ * Flags are optional parameters to pass to s_strcmp:
+ * LS_ICASE  makes comparaisons case-insensitive;
+ * LS_USPACE makes space character and underscore character effectively the same character;
+ * (ex: "Ville Montreal" and "Ville_Montreal" would return 0, match).
+ * LS_STRSTR makes s_strcmp behave like the standard strstr(), other flags are still valid.
+ *
  * The only way to see if s_strcmp had an error is to verify errno 
  * after each calls.
+ *
+ * Passing a 0 argument to num isn't an error, but makes s_strcmp() behaves like 
+ * the standard strstr() so beware!
  */
 static inline int s_strcmp(const char *s1, const char *s2, size_t num, int flags)
 {
   size_t len1 = 0, len2 = 0;
+
   errno = 0;
-  if (!s1 || !s2 || num == 0) {
+  if (!s1 || !s2) {
     errno = EINVAL;
     return 0;
   }
   /* 
-   * Make sure both string lenghts are bigger than or equal to num.
-   * If any strings are smaller than num, modify num localy so that it's 
-   * equal to the lenght of the smaller string.
+   * If the LS_STRSTR flag is on or num was set to 0, modify num localy so that it's 
+   * equal to the lenght of the smaller of both strings.
    */
-  if (num > (len1 = strlen(s1)) || num > (len2 = strlen(s2))){
-    if (len1 < len2) num = len1;
-    else num = len2;
-  }
-  
-  if (flags & LS_ICASE){
-    while(num-- != 0 && tolower(*s1) == tolower(*s2)){
-      if (num == 0 || *s1 == '\0' || *s2 == '\0') break;
-      s1++;
-      s2++;
+  if (flags & LS_STRSTR || num == 0){
+    len1 = strlen(s1);
+    len2 = strlen(s2);
+    if (num > len1 || num > len2){
+      if (len1 < len2) num = len1;
+      else num = len2;
     }
-    
-    return (tolower(*s1) - tolower(*s2));
   }
-
-  /* Default, no flags. */
-  while (num-- != 0 && *s1 == *s2){
+  while (num-- != 0){
     if (num == 0 || *s1 == '\0' || *s2 == '\0') break;
-    s1++;
-    s2++;
+    if ((*s1 == *s2) 
+	|| ((flags & LS_ICASE) && (tolower(*s1) == tolower(*s2)))
+	|| ((flags & LS_USPACE) && ((*s1 == SPACE || *s1 == USCORE)
+				    && (*s2 == SPACE || *s2 == USCORE)))){
+      ++s1;
+      ++s2;
+    }
+    else break;
   }
+  if (flags & LS_ICASE) return (tolower(*s1) - tolower(*s2));
   return (*s1 - *s2);
-
-
+  
 } /* s_strcmp() */
 
 
@@ -100,65 +114,34 @@ static inline int s_strcmp(const char *s1, const char *s2, size_t num, int flags
  * Set word_delim to -1 for default.
  * dest can hold at most dest_s-1 words.
  */
-static inline char** s_split(char **dest, const char* src, size_t dest_s,
-			     size_t word_s, int word_delim)
+static inline char** s_split(char **dest, const char *src, size_t dest_s,
+			     size_t src_s, size_t word_s, int word_delim)
 {
-  size_t src_ind = 0, dest_ind = 0, word_ind = 0;
-  int delimiter = ' ';                             /* Space delimited words unless told otherwise. */
+  size_t dest_ind = 0, word_ind = 0;
 
   if (!dest || !src || src[0] == '\0'
       || !dest_s || !word_s){
     errno = EINVAL;
     return NULL;
   }
-  if (word_delim >= 0) delimiter = word_delim;
-  
-  while(dest_ind < dest_s){
-    /* 
-     * Return successfuly if there's at least 1 word in the 
-     * destination array and the next word is NULL. 
-     */
-    if (!dest[dest_ind]){
-      if (dest_ind > 0) break;
-      else{
-	errno = ENODATA;
-	fprintf(stderr, "%s: dest must contain at least one initialized char array.\n\n", __func__);
-	return NULL;
-      }
-    }
-    /* Clear the current word buffer. */
-    memset(dest[dest_ind], '\0', word_s);
+  if (word_delim == -1) word_delim = SPACE;
 
-    /* Get a word. */
-    while(1){
-      if (src[src_ind] == '\0') {
-	dest[dest_ind][word_ind] = '\0';
-	return dest;
-      }
-      /* Finding a word that doesn't fit in a word buffer is an error. */
-      if (word_ind >= word_s){
-	errno = EOVERFLOW;
-	fprintf(stderr, "%s: The word following \"%s\" does not fit in the given buffer size '%zu'\n\n",
-		__func__, ((dest_ind > 0) ? dest[dest_ind-1] : "NO WORD REGISTERED"), word_s);
-	return NULL;
-      }
-      /* Null terminate the current word when hitting the delimiter. */
-      if (src[src_ind] == delimiter) {
-	dest[dest_ind][word_ind] = '\0';
-	word_ind = 0;
-	++dest_ind;
-	++src_ind;
+  while(dest_s-- != 0){
+    if (src_s == 0 || dest_s == 0 || !dest[dest_ind]) break;
+    memset(dest[dest_ind], '\0', word_s);
+    for (word_ind = 0; word_ind < word_s-1; word_ind++, src++){
+      if (*src == '\0' || src_s-- == 0) break;
+      if (*src == word_delim){
+	++src;
 	break;
       }
-      /* Add the current src character to the current dest word. */
-      dest[dest_ind][word_ind] = src[src_ind];
-      ++word_ind;
-      ++src_ind;
+      dest[dest_ind][word_ind] = *src;
     }
+    dest[dest_ind++][word_ind] = '\0';
   }
-
   return dest;
-}
+
+} /* s_split() */
 
 
 /* Convert the double integer src into a dest_s-1 precision string dest. */
@@ -199,5 +182,6 @@ static inline char* s_itoa(char *dest, int src, size_t dest_s)
 } /* s_itoa() */
 
 	       
-
+#undef SPACE
+#undef USCORE
 #endif /* LIB_SAFE_UTILS_HEADER_FILE */

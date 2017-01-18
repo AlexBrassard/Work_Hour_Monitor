@@ -6,11 +6,11 @@
 TOP
 ----
 Very Important:
-Note: Careful not to let to much spaces between them:
-    Spaces and underscores should be interchangeable when asking user to
-    input values so that "harvey inox" and "harvey_inox" would both match
-    the same entry.
-    
+Note: Fail like you were born to fail:
+    Any modifications should be written to disk only at the
+    very last moment so that when failing due to an error or a strong
+    will to cancel everything, not everything gets messed up.
+
 
 Very Important:
 Note: I'm leaving! But please don't be mad..:
@@ -114,4 +114,21 @@ Important:
 Note: Different cases, same problems:
     Whm_ask_user must not be sensitive to case (upper/lower) when it asks users for
     input. So "SLB", "Slb", "slb", "sLb", etc are all equivalent.
+
+
+[Done: s_strcmp now handles case-insensitive comparaisons. ]
+Very Important: 
+Note: Careful not to let to much spaces between them:
+    Spaces and underscores should be interchangeable when asking user to
+    input values so that "harvey inox" and "harvey_inox" would both match
+    the same entry.
+    
+
+[Done: The user is warned that the existing file is removed and recreated.]
+Important:
+Note: Fill those empty bellies:
+    A configuration file that contains only a heading message or
+    other comments should be considered empty and be removed to
+    be recreated.
+
 

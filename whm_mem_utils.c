@@ -349,6 +349,10 @@ whm_sheet_T* whm_init_sheet_type(void)
     WHM_ERRMESG("Malloc");
     return NULL;
   }
+  if ((sheet->path = calloc(WHM_MAX_PATHNAME_S, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    goto errjmp;
+  }
   /* 8: 1 for each week days + 1 for monthly totals. */
   if ((sheet->day_pos_hours = malloc(8 * sizeof(double*))) == NULL){
     WHM_ERRMESG("Malloc");
@@ -415,6 +419,10 @@ whm_sheet_T* whm_init_sheet_type(void)
 	}
       free(sheet->week);
       sheet->week = NULL;
+    }
+    if (sheet->path){
+      free(sheet->path);
+      sheet->path = NULL;
     }
     free(sheet);
     sheet = NULL;

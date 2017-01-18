@@ -9,7 +9,7 @@ int main (int argc, char **argv)
 {
 
   whm_config_T **configs = NULL;
-  int index = 0, i = 0;
+  int index = 0, i = 0, week_num = 0;
   FILE *stream = NULL;
   whm_time_T *time_o = NULL;
   char pathname[WHM_MAX_PATHNAME_S];
@@ -43,10 +43,15 @@ int main (int argc, char **argv)
     WHM_ERRMESG("Whm_get_time");
     return -1;
   }
-  for (i = 0; i < 2; i++)
-    printf("\nThis sheet's path: %s\n",
-	   whm_make_sheet_path(pathname, time_o, configs[i]));
-    
+  if ((stream = fopen("/home/lappop/Main_config_template.txt", "w")) == NULL){
+    WHM_ERRMESG("Fopen");
+    return -1;
+  }
+
+
+  printf("This month's first week day: %s\n\t\tWeek number: %d\n\n",
+	 WHM_FR_DAYS[whm_find_first_dom(time_o, &week_num)],
+	 week_num);
   
   return 0;
 

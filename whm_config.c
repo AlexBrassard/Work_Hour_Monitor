@@ -11,11 +11,12 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/stat.h>
 
 #include "whm.h"
 #include "whm_error.h"
 
-/* Create a new configuration file containing only a heading message. */
+/* Create a new configuration file and prompt user for entries to fill it. */
 int whm_new_config(const char *pathname,
 		   int *c_ind,
 		   whm_config_T **configs)
@@ -43,13 +44,13 @@ int whm_new_config(const char *pathname,
    * user in the next steps will be kept in memory until 
    * whm_parse_options or whm_automatic_mode is finished its work.
    */
-
   fclose(stream);
   stream = NULL;
 
   /* 
    * Use whm_add_config() to prompt the user to add company(ies)
-   * to the configuration file, up to WHM_MAX_CONFIG_ENTRIES. 
+   * to the configuration file, up to WHM_MAX_CONFIG_ENTRIES,
+   * then create a new working directory for this company.
    */
   printf("\nWork Hour Monitor\nNew configuration file setup\n\n");
   while (*c_ind < WHM_MAX_CONFIG_ENTRIES){
@@ -57,14 +58,25 @@ int whm_new_config(const char *pathname,
       WHM_ERRMESG("Whm_add_config");
       goto errjmp;
     }
+    if (whm_new_dir(configs[*c_ind]->working_directory) != 0
+	&& errno != WHM_DIREXIST) {
+      WHM_ERRMESG("Whm_new_dir");
+      goto errjmp;
+    }
+    
+    ++(*c_ind);
     if (whm_ask_user(ADD_COMPANY, answer, WHM_NAME_STR_S,
-		     configs[*c_ind], 0) != 0){
+		     NULL, 0) != 0){
       WHM_ERRMESG("Whm_ask_user");
       goto errjmp;
     }
     if (answer[0] == 'n' || answer[0] == 'N') break;
   }
 
+  if (chmod(pathname, 0600) != 0){
+    WHM_ERRMESG("Chmod");
+    goto errjmp;
+  }
   return 0;
 
 
@@ -73,6 +85,13 @@ int whm_new_config(const char *pathname,
     fclose(stream);
     stream = NULL;
   }
+  /* 
+   * If the configuration file was created now, remove it
+   * to start fresh next time, else if we're here cause the
+   * file already exists, don't touch it. 
+   */
+  if (errno != WHM_FILEEXIST)
+    remove(WHM_CONFIGURATION_FILE);
   return -1;
 
 } /* whm_new_config() */
@@ -247,9 +266,6 @@ int whm_add_config(int *c_ind,                   /* Index of the first free elem
 
   /* Set the status of the new company to active. */
   configs[*c_ind]->status++;
-
-  /* Increment the configuration entry's counter and return with success. */
-  ++(*c_ind);
 
   if (answer){
     free(answer);

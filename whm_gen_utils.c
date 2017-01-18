@@ -443,3 +443,94 @@ int whm_ask_user(enum whm_question_type question,
 } /* whm_ask_user() */
 
 
+/*                                                                                                                                    
+ * Verify or create a year directory for a given company name.                                                                        
+ * The name of this directory is always the year in numeric format.                                                                   
+ * Returns successfuly if the directory already exists.                                                                               
+ */
+int whm_new_year_dir(whm_config_T *config,
+		     whm_time_T *time_o)
+{
+  FILE *stream = NULL;
+  char path[WHM_MAX_PATHNAME_S];
+  
+  if (!config || !time_o) {
+    errno = EINVAL;
+    return -1;
+  } 
+
+  /* 
+   * The directory path is always:
+   * /program's working directory/Company_name.d/year\0
+   * +5:                         ^            ^^^     ^
+   */
+  if ((strlen(WHM_WORKING_DIRECTORY) + strlen(config->employer)
+       + strlen(time_o->year) + 5) > WHM_MAX_PATHNAME_S) {
+    errno = EOVERFLOW;
+    return -1;
+  }
+  if (s_strcpy(path, (char*)WHM_WORKING_DIRECTORY, WHM_MAX_PATHNAME_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return -1;
+  }
+  strcat(path, "/");
+  strcat(path, config->employer);
+  strcat(path, ".d");
+  strcat(path, "/");
+  strcat(path, time_o->year);
+  if ((stream = fopen(path, "r")) != NULL){
+    fclose(stream);
+    stream = NULL;
+    return 0;
+  }
+  
+  if (whm_new_dir((const char*)path) != 0
+      && errno != WHM_DIREXIST){
+    WHM_ERRMESG("Whm_new_dir");
+    return -1;
+  }
+
+  return 0;
+} /* whm_new_year_dir() */
+
+
+/*
+ * Find the first weekday of time_o's month,
+ * and get the week number of the its first week 
+ */
+int whm_find_first_dom(whm_time_T *time_o,
+		       int *week_num)
+{
+  size_t date = 0, day_ind = 0;
+  if (!time_o || !week_num){
+    errno = EINVAL;
+    return -1;
+  }
+  
+  /* Keep in mind that Sunday is day 0, Saturday is day 6. */
+  date      = atoi(time_o->date);
+  *week_num = atoi(time_o->week);
+  
+  /* Determine todays day name. */
+  for (; day_ind < 6; day_ind++)
+    if (s_strcmp(time_o->day, WHM_EN_DAYS[day_ind], 0, LS_STRSTR) == 0)
+      break;
+
+  /* There was a problem. */
+  if (day_ind > 6) {
+    errno = WHM_INVALIDELEMCOUNT;
+    return -1;
+  }
+  
+  /* Find the first day of month. */
+  while (date-- > 1)
+    if (day_ind-- == 0) {
+      day_ind = 6;
+      if ((*week_num)-- == 0){
+	errno = WHM_INVALIDELEMCOUNT;
+	return -1;
+      }			       
+    }
+
+  return day_ind;
+} /* whm_find_first_dom() */

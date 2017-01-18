@@ -45,8 +45,17 @@
 # define NUMBER  '#'                             /* Represents the number character.               */
 # define DOT     '.'                             /* Represents the dot character.                  */
 # define U_SCORE '_'                             /* Represents the underscore character.           */
+/* Represents missing records in an hour sheet. */
+# define WHM_NO_DATE   "--"
+# define WHM_NO_HOUR   "--.--"
+# define WHM_NO_CASH   "---.--"
+# define WHM_NO_THOUR  "---.--"
+# define WHM_NO_TCASH  "-----.--"
 
 # define WHM_INPUTDONE             -2222         /* Used by whm_ask_user to signify input is done. */
+
+/* The program's name. */
+static const char WHM_PROGRAM_NAME[]     = "whm";
 
 /* Suffix appended to every newly created backup file. */
 static const char WHM_BKUP_SUFFIX[]      = ".whmbkup";
@@ -89,6 +98,21 @@ static const char WHM_FR_MONTHS[][WHM_NAME_STR_S] = {
   "Octobre", "Novembre", "Decembre"
 };
 
+/* Names of each days of the week, in french. */
+static const char WHM_FR_DAYS[][WHM_NAME_STR_S] = {
+  "Dimanche", "Lundi",
+  "Mardi",    "Mercredi",
+  "Jeudi",    "Vendredi",
+  "Samedi"
+};
+
+/* Names of each days of the week, in english. */
+static const char WHM_EN_DAYS[][WHM_NAME_STR_S] = {
+  "Sunday",   "Monday",
+  "Tuesday",  "Wednesday",
+  "Thursday", "Friday",
+  "Saturday"
+};
 
 /*** Data types ***/
 
@@ -127,6 +151,7 @@ typedef struct whm_config_type {
 
 /* Holds all information regarding a single hour sheet. */
 typedef struct whm_sheet_type {
+  char                     *path;                /* This sheet's path.  */
   int                      year;                 /* This sheet's year.  */
   int                      month;                /* This sheet's month. */
   double                   **day_pos_hours;      /* Cumulatives, per week day, per positions. (+1 for monthly totals.) */
@@ -249,6 +274,10 @@ int            whm_ask_user        (enum whm_question_type questions, /* Ask a q
 				    size_t answer_s,
 				    whm_config_T *config,
 				    int pos_ind);
+int            whm_new_year_dir    (whm_config_T *config,  /* Verify and create if needed each company's current year dir. */
+				    whm_time_T *time_o);
+int            whm_find_first_dom  (whm_time_T *time_o,    /* Find the first week day of the month, and its week number.   */
+				    int *week_num);
 
 /* whm_config.c    */
 int            whm_new_config      (const char *pathname,  /* Create a new configuration file.                             */
@@ -291,6 +320,9 @@ int            whm_get_field_name    (char *string,        /* Get the whm_config
 char*          whm_make_sheet_path   (char *filename,      /* Build an absolute pathname of the given company's latest sheet. */
 				      whm_time_T *time_o,
 				      whm_config_T *config);
+int            whm_print_sheet_head  (FILE *stream,        /* Print a heading message to the given stream. */
+				      whm_config_T *config,
+				      whm_time_T *time_o);
 
 
 void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */

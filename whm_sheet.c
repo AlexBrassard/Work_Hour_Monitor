@@ -18,7 +18,7 @@ int whm_create_sheet(whm_sheet_T  *sheet,
 		     whm_config_T *config,
 		     whm_time_T   *time_o)
 {
-
+  FILE *stream = NULL;
 
   if (!sheet || !config || !time_o){
     errno = EINVAL;
@@ -29,11 +29,25 @@ int whm_create_sheet(whm_sheet_T  *sheet,
    * Make an absolute pathname, including a unique 
    * filename for the new hour sheet. 
    */
+  if (whm_make_sheet_path(sheet->path, time_o, config) == NULL){
+    WHM_ERRMESG("Whm_make_sheet_path");
+    return -1;
+  }
 
   /* 
    * Try to open the file at the pathname we just created.
    * If it succeed close the stream and return an error. 
    */
+  if ((stream = fopen(sheet->path, "r")) != NULL) {
+    fclose(stream);
+    stream = NULL;
+    errno = WHM_FILEEXIST;
+    return -1;
+  }
+  if ((stream = fopen(sheet->path, "w")) == NULL){
+    WHM_ERRMESG("Fopen");
+    return -1;
+  }
 
   /* Use whm_print_sheet_head() to print a heading message to the new file. */
 
@@ -95,15 +109,54 @@ char* whm_make_sheet_path(char *filename,
 } /* whm_make_sheet_path() */
 
 
+/* Print a predefined message into the given sheet stream. */
+int whm_print_sheet_head(FILE *stream,
+			 whm_config_T *config,
+			 whm_time_T *time_o)
+{
+  if (!stream || !config || !time_o){
+    errno = EINVAL;
+    return -1;
+  }
+
+  fprintf(stream, "/*\n * Work Hour Monitor\n * Heures travaillees chez %s pour le mois de %s %s.\n \
+*\n *\n *\n * Respectez le format et les espacements lors des modifications manuelles de ce fichier.\n *\n */\n\n",
+	  config->employer, WHM_FR_MONTHS[atoi(time_o->month)],
+	  time_o->year);
+  return 0;
+}
 
 
+/* Print the calendar part of an hour sheet to the given stream. */
+int whm_print_sheet_cal(FILE *stream,
+			whm_config_T *config,
+			whm_time_T *time_o,
+			whm_sheet_T *sheet)
+{
+  size_t week_ind = 0, day_ind = 0, pos_ind = 0;
+  int line_count = 0;
+  char temp[WHM_MAX_PATHNAME_S]; /* s_itoa() needs a temporary buffer. */
+	    
+
+  if (!stream || !config
+      || !time_o || !sheet){
+    errno = EINVAL;
+    return -1;
+  }
 
 
-  /* 
-   * Verify or create a year directory for a given company name.
-   * The name of this directory is always the year in numeric format.
-   * Returns successfuly if the directory already exists. 
-   */
-  int whm_new_year_dir(whm_config_T *config) {
-    return 0;
-  } /* whm_new_year_dir() */
+  for (; week_ind < 6; week_ind++){
+    fprintf(stream, "Semaine %zu", sheet->week[week_ind]->week_number);
+    for (; day_ind < 7; day_ind++){
+      fprintf(stream, "%3s %2s   ",
+	      WHM_FR_DAYS[day_ind],
+	      ((sheet->week[week_ind]->day[day_ind]->date == -1)
+	       ? WHM_NO_DATE
+	       : s_itoa(temp, sheet->week[week_ind]->day[day_ind]->date, WHM_MAX_PATHNAME_S)));
+    }
+    
+   
+  }
+  
+  return 0;
+} /* whm_print_sheet_cal() */
