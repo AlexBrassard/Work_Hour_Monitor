@@ -9,9 +9,6 @@
                                       \         /
 					   |
 					   |
-			    whm_backup_file(configuration file)
-					   |
-					   |
 				      /         \
 				   /               \
 				/     	              \
@@ -21,14 +18,11 @@
 				      \         /
 				           |
 					   |
-			    whm_backup_file(all read sheets)
-			    		   |
-					   |
 			          whm_parse_options()
 		        [One or more of the following options]
 			     	     	   |
 					  /|\
-  whm_add_config()   whm_del_config()         whm_[inter]_modif_config() whm_list_config_field()  
+  whm_add_config()   whm_rm_config()         whm_[inter]_modif_config() whm_list_config_field()  
   whm_print_config() whm_list_config_fields() whm_del_sheet()            whm_print_sheet()
   whm_[inter]_update_sheet()	     
 				          \|/
@@ -37,14 +31,19 @@
 			     [Update non-up-to-date sheets]
 				           |
 					   |
+			    whm_backup_file(configuration file)
+					   |
+					   |
 			           whm_write_config() ----------------
 					   |                         |
 					   |			     |
- 	                  whm_delete_backup(configuration file)      |>>> The whm_write_*() functions are the 
-			                   |                         |    only points in execution where writing to
-					   |                         |    disk can happen.
+		            whm_backup_file(all read sheets)         | >>> The only point in execution where updated
+  				           |	     		     |     files are written to disk.
+					   |                         |
 			    whm_write_sheet(all read sheets) ---------
 			                   |
 					   |
 			  whm_delete_backup(all read sheets);
-					
+			  		   |
+					   |
+			  whm_delete_backup(configuration file)     		

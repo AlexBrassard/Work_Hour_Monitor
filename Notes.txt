@@ -16,7 +16,7 @@ Very Important:
 Note: I'm leaving! But please don't be mad..:
     Every time WHM asks its users something, there must be safe escape routes,
     safe meaning without consequences on the program's existing data.
-    There should be a way to quit the program total, without data lost other than
+    There should be a way to quit the program totaly, without data lost other than
     what hasn't been already saved to disk, even in the middle of say modifing the configuration file.
     At each steps there should be an option to roll back one or more steps
     in order to modify/overwrite something we've just input.

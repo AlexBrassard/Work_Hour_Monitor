@@ -99,15 +99,6 @@ int main(int argc, char **argv)
       WHM_ERRMESG("Whm_new_year_dir");
       goto errjmp;
     }
-  /* 
-   * Before making any modifications to the configuration file, do a backup. 
-   * This backup is removed only when the configuration file is written to disk.
-   */
-  if (whm_create_backup(WHM_CONFIGURATION_FILE,
-			config_bkup_name) == NULL){
-    WHM_ERRMESG("Whm_create_backup");
-    goto errjmp;
-  }
 
   if (argc > 1){ /* There might be options. */
     /* Use whm_parse_options() to execute options. */
@@ -116,7 +107,18 @@ int main(int argc, char **argv)
   /* If the program hasn't terminated yet, execute the automatic mode as well. */
   
 
-  /* Before exiting, write the configuration file to disk. */
+
+  /* 
+   * Before making any modifications to the configuration file, do a backup. 
+   * This backup is removed only after the configuration file is written to disk.
+   */
+  if (whm_create_backup(WHM_CONFIGURATION_FILE,
+			config_bkup_name) == NULL){
+    WHM_ERRMESG("Whm_create_backup");
+    goto errjmp;
+  }
+
+  /* Write the configuration file to disk. */
   if (whm_write_config(c_ind,
 		       WHM_CONFIGURATION_FILE,
 		       configs) == -1) {
@@ -194,3 +196,60 @@ void whm_PRINT_config(whm_config_T *config)
   fprintf(stderr, "\nNight prime: %s\nDo pay holidays: %zu\n\n",
 	  config->night_prime, config->do_pay_holiday);
 }
+
+
+/* print the content of a whm_sheet_T* object. */
+void whm_PRINT_sheet(whm_sheet_T *sheet, whm_config_T *config)
+{
+  int i = 0, b = 0;
+  size_t c = 0;
+
+  if (!sheet || !config) return;
+
+  fprintf(stderr, "\nCompany: %s  Path: %s  Year: %d  Month: %d\nCumulatives:\nHours:     ",
+	  config->employer, sheet->path, sheet->year, sheet->month);
+  for (i = 0; i < 7; i++){
+    fprintf(stderr, "\nDay %d ", i);
+    for(c = 0; c < config->numof_positions; c++)
+      fprintf(stderr, "%f  ", sheet->day_pos_hours[i][c]);
+  }
+  fprintf(stderr, "\nEarnings: ");
+  for (i = 0; i < 7; i++){
+    fprintf(stderr, "\nDay %d ", i);
+    for (c = 0; c < config->numof_positions; c++)
+      fprintf(stderr, "%f  ", sheet->day_pos_earnings[i][c]);
+  }
+
+  for (i = 0; i < 6; i++){
+    fprintf(stderr, "\n\nWeek Number: %zu  Total hours: %f  Total earnings: %f\nPer position hours:    ",
+	    sheet->week[i]->week_number,
+	    sheet->week[i]->total_hours,
+	    sheet->week[i]->total_earnings);
+    for (c = 0; c < config->numof_positions; c++)
+      fprintf(stderr, "%f  ", sheet->week[i]->pos_total_hours[c]);
+    fprintf(stderr, "\nPer position earnings: ");
+    for (c = 0; c < config->numof_positions; c++)
+      fprintf(stderr, "%f  ", sheet->week[i]->pos_total_earnings[c]);
+
+    for (b = 0; b < 7; b++) {
+      fprintf(stderr, "\nDate: %d  Total hours: %f  Total earnings: %f\nPer position hours:    ",
+	      sheet->week[i]->day[b]->date,
+	      sheet->week[i]->day[b]->total_hours,
+	      sheet->week[i]->day[b]->total_earnings);
+      for (c = 0; c < config->numof_positions; c++)
+	fprintf (stderr, "%f  ", sheet->week[i]->day[b]->pos_hours[c]);
+      fprintf(stderr, "\nPer position earnings: ");
+      for (c = 0; c < config->numof_positions; c++)
+	fprintf(stderr, "%f  ", sheet->week[i]->day[b]->pos_earnings[c]);
+      fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
+  }
+
+  fprintf(stderr, "\n\n");
+
+} /* whm_PRINT_sheet() */
+
+
+
+

@@ -16,7 +16,7 @@
 #include "whm.h"
 #include "whm_error.h"
 
-/* Create a new configuration file and prompt user for entries to fill it. */
+/* Fill the structures needed to later write/create the configuration file. */
 int whm_new_config(const char *pathname,
 		   int *c_ind,
 		   whm_config_T **configs)
@@ -33,19 +33,6 @@ int whm_new_config(const char *pathname,
     errno = WHM_FILEEXIST;
     goto errjmp;
   }
-  if ((stream = fopen(pathname, "w")) == NULL){
-    WHM_ERRMESG("Fopen");
-    goto errjmp;
-  }
-  /* WHM_CONFIG_HEADER_MSG is living in whm.h. */
-  fprintf(stream, "%s\n", WHM_CONFIG_HEADER_MSG);
-  /* 
-   * Close the stream now. All information gathered from the 
-   * user in the next steps will be kept in memory until 
-   * whm_parse_options or whm_automatic_mode is finished its work.
-   */
-  fclose(stream);
-  stream = NULL;
 
   /* 
    * Use whm_add_config() to prompt the user to add company(ies)
@@ -73,10 +60,6 @@ int whm_new_config(const char *pathname,
     if (answer[0] == 'n' || answer[0] == 'N') break;
   }
 
-  if (chmod(pathname, 0600) != 0){
-    WHM_ERRMESG("Chmod");
-    goto errjmp;
-  }
   return 0;
 
 
@@ -85,13 +68,6 @@ int whm_new_config(const char *pathname,
     fclose(stream);
     stream = NULL;
   }
-  /* 
-   * If the configuration file was created now, remove it
-   * to start fresh next time, else if we're here cause the
-   * file already exists, don't touch it. 
-   */
-  if (errno != WHM_FILEEXIST)
-    remove(WHM_CONFIGURATION_FILE);
   return -1;
 
 } /* whm_new_config() */
@@ -501,6 +477,11 @@ int whm_write_config(int c_ind,
    
   fclose(stream);
   stream = NULL;
+  if (chmod(config_path, 0600) != 0){
+    WHM_ERRMESG("Chmod");
+    return -1;
+  }
+
 
   return 0;
 
@@ -1044,9 +1025,9 @@ int whm_list_config_fields(char *company,
  * This will NOT remove the company's directory and hours sheets.
  * A user must do this manualy.
  */
-int whm_delete_config(char *company,
-		      int *max_config_ind,
-		      whm_config_T **configs)
+int whm_rm_config(char *company,
+		  int *max_config_ind,
+		  whm_config_T **configs)
 {
   int c_ind = 0;
   size_t i = 0;

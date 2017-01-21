@@ -5,7 +5,7 @@
  */
 
 
-/*** Legend ***/
+  /*** Legend ***/
 P------  Pseudocoded
 -C-----  Coded
 --M----  MACRO
@@ -13,6 +13,7 @@ P------  Pseudocoded
 ----O--  Obsolete
 -----T-  Called via command line option
 ------A	 Actively working on it
+
 
 STATUS	  NAME			     FILE		   DESCRIPTION
 
@@ -48,9 +49,10 @@ P------	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_remove_bkup	     whm_gen_utils.c	   Remove a given backup file.
 -C-----	  whm_ask_user		     whm_gen_utils.c	   Ask the user via stdin the requested information.
 -C-----	  whm_new_year_dir	     whm_gen_utils.c	   Check existance or create a yearly sheet directory for a given company.
+-C-----	  whm_skip_comments	     whm_gen_utils.c	   Skip a commentary character sequence.
 
 -C---T-	  whm_add_config	     whm_config.c	   Add a company to an existing configuration file.
--C---T-	  whm_del_config	     whm_config.c	   Delete a company from an existing configuration file.
+-C---T-	  whm_rm_config	              whm_config.c	   Delete a company from an existing configuration file.
 -C---T-   whm_modify_config	     whm_config.c	   Modify an existing entry in an existing configuration file.
 PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper arround whm_modify_config.
 -C-----	  whm_new_config	     whm_config.c	   Create a new configuration file.
@@ -62,14 +64,17 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -C-----   whm_get_company_name	     whm_config.c	   Interactively get a company name to be edited by whm_modify_config().
 -C-----   whm_get_field_name	     whm_config.c	   Interactively get a field name to be edited by whm_modify_config().
 
------TA	  whm_new_sheet		     whm_sheet.c	   Create a new, empty hour sheet.
+-C---T-*  whm_new_sheet		     whm_sheet.c	   Fill a sheet structure representing a new hour sheet.
 -C-----	  whm_print_sheet_head       whm_sheet.c	   Print a header message into a new hour sheet.
-------A	  whm_print_sheet_cal        whm_sheet.c	   Print the calendar part of an hour sheet.
--------	  whm_print_sheet_cumul	     whm_sheet.c	   Print the cumulatives part of an hour sheet.
--------	  whm_read_sheet	     whm_sheet.c	   Read an existing hour sheet.
--------	  whm_write_sheet	     whm_sheet.c	   Write an updated hour sheet.
+-C-----	  whm_print_sheet_cal        whm_sheet.c	   Print the calendar part of an hour sheet.
+-C-----	  whm_print_sheet_cumul	     whm_sheet.c	   Print the cumulatives part of an hour sheet.
+------A	  whm_read_sheet	     whm_sheet.c	   Read an existing hour sheet.
+------A	  whm_parse_sheet_cal	     whm_sheet.c	   Parse the calendar content read from an hour sheet.
+-------	  whm_parse_sheet_cumul	     whm_sheet.c	   Parse the cumulatives content read from an hour sheet.
+-------	  whm_queue_to_sheet	     whm_sheet.c	   Empty a working queue (whm_queue_T) into a whm_sheet_T* object.
+-C-----	  whm_write_sheet	     whm_sheet.c	   Write the given hour sheet to the given stream.
 -C-----	  whm_make_sheet_path	     whm_sheet.c	   Build a new sheet's absolute pathname.
------T-	  whm_delete_sheet	     whm_sheet.c	   Delete an existing hour sheet.
+-----T-	  whm_rm_sheet		     whm_sheet.c	   Delete an existing hour sheet.
 -----T-	  whm_print_sheet	     whm_sheet.c	   Print an hour sheet to stdout.
 -----T-	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet.
 -----T-	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
@@ -77,8 +82,14 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -CM----	  WHM_TRIM_NEWLINE	     whm.h		   Trim a trailing newline from a given string.
 -CM----	  WHM_REPLACE_SPACE	     whm.h		   Replace a space character by an underscore.
 
--C-I---   Safe-utils Library         sutils.h		   Small collection of useful utilities.
+-C-I---   Safe-utils Library         sutils.h		   Small collection of useful utilities (all s_ functions).
 
+-C-----	  whm_PRINT_config	     whm_main.c		   GDB HOOK - Print all informations of a whm_config_T* object.
+-C-----	  whm_PRINT_sheet	     whm_main.c		   GDB HOOK - Print all informations of a whm_sheet_T* object.
+
+* The more I think about it, the less I see it as a suitable option.
+  Whm should be the only one responsible of determining when to create
+  a new sheet. Whm_rm_sheet tho, should be an option.
 
 /****************************************************************************************/
 /** Obsolete functions and notes. **/

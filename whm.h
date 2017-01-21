@@ -27,11 +27,14 @@
 # define WHM_MAX_NUMOF_OPTIONS    256            /* Maximum number of command line options.        */
 # define WHM_PROG_NUMOF_OPTIONS   5              /* Current number of options available to use.    */
 # define WHM_MAX_CONFIG_ENTRIES   256            /* No more than 256 companies in the config file. */
+# define WHM_MAX_NUMOF_SHEETS     WHM_MAX_CONFIG_ENTRIES /* Maximum number of hour sheets in memory. */
 # define WHM_MAX_PATHNAME_S       4096           /* Maximum lenght of pathnames.                   */
 # define WHM_LINE_BUFFER_S        WHM_MAX_PATHNAME_S /* Size of buffers used to read lines.        */  
 # define WHM_NUMOF_EOI_STRINGS    9              /* Number of "end of input" character (see array below). */
+# define WHM_HOUR_SHEET_SIZE      8192           /* By default takes 6261 bytes, reserving 1800+ bytes for possible comments. */
 
 # define WHM_DEF_NUMOF_POSITIONS  24             /* Default maximum number of positions and wages. */
+# define WHM_DEF_QUEUE_SIZE       32             /* Default maximum number of strings in a whm_queue_T* object. */ 
 
 # define WHM_DIRECTORY_PERMISSION 0777           /* Permissions on a newly created directory (gives 755 when & ~umask & 0777). */
 # define WHM_FILE_PERMISSION      0600           /* Permissiosn on a newly created file.           */
@@ -154,6 +157,8 @@ typedef struct whm_sheet_type {
   char                     *path;                /* This sheet's path.  */
   int                      year;                 /* This sheet's year.  */
   int                      month;                /* This sheet's month. */
+  double                   *day_total_hours;     /* Total hours, per week day, all positions combined.                 */
+  double                   *day_total_earnings;  /* Total earnings, per week day, all position combined.               */
   double                   **day_pos_hours;      /* Cumulatives, per week day, per positions. (+1 for monthly totals.) */
   double                   **day_pos_earnings;   /* Cumulatives, per week day, per positions. (+1 for monthly totals.) */
   struct whm_week_type     **week;               /* Array of 6 week objects, one for each week of the month.           */
@@ -164,10 +169,10 @@ typedef struct whm_sheet_type {
 /* Holds all information regarding a single week of an hour sheet. */
 typedef struct whm_week_type {
   size_t                   week_number;          /* From 0 to 53.                                          */
-  double                   pos_total_hours;      /* Total hours worked this week, per positions.           */
-  double                   pos_total_earnings;   /* Total earnings, per positions.                         */
   double                   total_hours;          /* Total hours, all positions combined.                   */
   double                   total_earnings;       /* Total earnings, all positions combined.                */
+  double                   *pos_total_hours;     /* Total hours worked this week, per positions.           */
+  double                   *pos_total_earnings;  /* Total earnings, per positions.                         */
   struct whm_day_type      **day;                /* Array of 7 day objects, one for each days of the week. */
 
 } whm_week_T;
@@ -175,10 +180,10 @@ typedef struct whm_week_type {
 /* Holds all information regarding a single day of a single week of an hour sheet. */
 typedef struct whm_day_type {
   int                      date;                 /* This day's date, from 1 to 31. -1: no informations.     */
-  double                   *pos_hours;           /* Hours worked for each positions.                        */
-  double                   *pos_earnings;        /* Earnings for each positions.                            */
   double                   total_hours;          /* Total hours worked, all positions combined.             */
   double                   total_earnings;       /* Total earnings, all position combined.                  */
+  double                   *pos_hours;           /* Hours worked for each positions.                        */
+  double                   *pos_earnings;        /* Earnings for each positions.                            */
 
 } whm_day_T;
 
@@ -278,6 +283,9 @@ int            whm_new_year_dir    (whm_config_T *config,  /* Verify and create 
 				    whm_time_T *time_o);
 int            whm_find_first_dom  (whm_time_T *time_o,    /* Find the first week day of the month, and its week number.   */
 				    int *week_num);
+int            whm_skip_comments   (char *string,          /* Skip a commentary character sequence.                        */
+				    int *ind,
+				    int multi_lines);
 
 /* whm_config.c    */
 int            whm_new_config      (const char *pathname,  /* Create a new configuration file.                             */
@@ -288,10 +296,10 @@ int            whm_add_config      (int *config_index,     /* Add a company to t
 int            whm_delete_config   (char *company,         /* Delete the given company from the configuration file.        */
 				    int *max_config_ind,
 				    whm_config_T **configs);
-int            whm_read_config     (FILE *stream,          /* Read the configuration file. */
+int            whm_read_config     (FILE *stream,          /* Read the configuration file.                                 */
 				    int *c_ind,
 				    whm_config_T **configs);
-int            whm_write_config    (int c_ind,             /* Write the configuration file to disk. */
+int            whm_write_config    (int c_ind,             /* Write the configuration file to disk.                        */
 				    const char *config_path,
 				    whm_config_T **configs);
 int            whm_modify_config   (char *company,         /* Update one field of the given whm_config_T struct array. */
@@ -317,15 +325,33 @@ int            whm_get_field_name    (char *string,        /* Get the whm_config
 				      whm_config_T **configs);
 
 /* whm_sheet.c   */
+int            whm_create_sheet      (whm_sheet_T *sheet,  /* Fill the structure representing an hour sheet.               */
+				      size_t *sheet_ind,
+				      whm_config_T *config,
+				      whm_time_T *time_o);
 char*          whm_make_sheet_path   (char *filename,      /* Build an absolute pathname of the given company's latest sheet. */
 				      whm_time_T *time_o,
 				      whm_config_T *config);
-int            whm_print_sheet_head  (FILE *stream,        /* Print a heading message to the given stream. */
+int            whm_print_sheet_head  (FILE *stream,        /* Print a heading message to the given stream.                 */
 				      whm_config_T *config,
 				      whm_time_T *time_o);
+int            whm_print_sheet_cal   (FILE *stream,        /* Print the given hour sheet to the given stream.              */
+				      whm_config_T *config,
+				      whm_time_T *time_o,
+				      whm_sheet_T *sheet);
+int            whm_print_sheet_cumul (FILE *stream,        /* Print the cumulative section of an hour sheet.               */
+				      whm_config_T *config,
+				      whm_time_T *time_o,
+				      whm_sheet_T *sheet);
+int            whm_write_sheet       (FILE *stream,       /* Write the given sheet to the given stream.                    */
+				      whm_config_T *config,
+				      whm_time_T *time_o,
+				      whm_sheet_T *sheet);
 
 
 void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
+void whm_PRINT_sheet(whm_sheet_T *sheet,                   /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
+		     whm_config_T *config);
 /*** MACROS ***/
 
 /* Remove a trailing newline. */
@@ -342,8 +368,6 @@ void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook
       ++i;						\
     }							\
   } while (0);
-
-
 
 
 #endif /* WHM_MAIN_HEADER_FILE */

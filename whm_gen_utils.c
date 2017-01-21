@@ -195,6 +195,8 @@ int whm_set_string(whm_queue_T *queue, char *value)
     return -1;
   }
   queue->index++;
+  /* Not sure the following line is good practice... */
+  memset(value, '\0', strlen(value));
 
   return 0;
 
@@ -513,7 +515,7 @@ int whm_find_first_dom(whm_time_T *time_o,
   
   /* Determine todays day name. */
   for (; day_ind < 6; day_ind++)
-    if (s_strcmp(time_o->day, WHM_EN_DAYS[day_ind], 0, LS_STRSTR) == 0)
+    if (strstr(WHM_EN_DAYS[day_ind], time_o->day) != NULL)
       break;
 
   /* There was a problem. */
@@ -534,3 +536,61 @@ int whm_find_first_dom(whm_time_T *time_o,
 
   return day_ind;
 } /* whm_find_first_dom() */
+
+
+/* 
+ * Skip a commentary sequence, move *index to the next character
+ * following the end of comment.
+ *
+ * A commentary may be one of these sequences:
+ * From '#' till the end of line;                       Single line
+ * from '//' till the end of line;                      Single line
+ * from the leading '\/\*' till the trailing '\*\/'.    Multi-lines
+ * An non-terminated multi-lines sequence is a fatal error.
+ *
+ * This function trusts its caller to detect what kind of comments
+ * it is dealing with and pass this infomation along in the multi_lines
+ * argument, which is bigger than 0 if the sequence is a multi-lines sequence,
+ * <= 0 if it's a single line sequence.
+ */
+int whm_skip_comments(char *string,
+		      int *ind,
+		      int multi_lines)
+{
+
+
+  if (!string || !ind) {
+    errno = EINVAL;
+    return -1;
+  }
+  
+  if (multi_lines > 0)
+    /* Reaching end of string before end of comment can't be forgiven. */
+    while (1) {
+      if (string[*ind] == STAR) {
+	if (string[(*ind)+1] != '\0' && string[(*ind)+1] != EOF){
+	  if (string[(*ind)+1] == SLASH) {
+	    (*ind) += 2;
+	    break;
+	  }
+	}
+	else {
+	  goto invalid_comment;
+	}
+      }
+      ++(*ind);
+    }
+  else
+    while(string[*ind] != NEWLINE) {
+      if (string[*ind] == '\0') break;
+      ++(*ind);
+    }
+
+  return 0;
+
+ invalid_comment:
+  errno = WHM_INVALIDCOMMENT;
+  return -1;
+
+
+} /* whm_skip_comments() */

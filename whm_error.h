@@ -32,7 +32,8 @@ typedef enum whm_errcodes_type {
   WHM_INVALIDSTATUS,
   WHM_INVALIDPOSITION,
   WHM_INVALIDWAGE,
-  WHM_MISSINGWAGE
+  WHM_MISSINGWAGE,
+  WHM_INVALIDCOMMENT
  
 } whm_errcodes_T;
 
@@ -55,7 +56,8 @@ static const char whm_errmesg[][WHM_ERRMESG_MAX_LENGHT] = {
   "Invalid status, must be \"Actif (1)\" or \"Inactif (0)\"",
   "The desired position does not exists",
   "The given wage is invalid",
-  "Missing a wage per hour for the given position name"
+  "Missing a wage per hour for the given position name",
+  "Invalid commentary sequence, likely an unterminated multi-lines sequence"
   
   
 };

@@ -288,6 +288,14 @@ whm_week_T* whm_init_week_type(void)
     WHM_ERRMESG("Malloc");
     return NULL;
   }
+  if ((week->pos_total_hours = malloc(WHM_DEF_NUMOF_POSITIONS * sizeof(double))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  if ((week->pos_total_earnings = malloc(WHM_DEF_NUMOF_POSITIONS * sizeof(double))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
   if ((week->day = malloc(7 * sizeof(whm_day_T*))) == NULL){
     WHM_ERRMESG("Malloc");
     goto errjmp;
@@ -297,8 +305,11 @@ whm_week_T* whm_init_week_type(void)
       WHM_ERRMESG("Whm_init_day_type");
       goto errjmp;
     }
-  week->pos_total_hours    = -1.0;
-  week->pos_total_earnings = -1.0;
+  for (i = 0; i < WHM_DEF_NUMOF_POSITIONS; i++){
+    week->pos_total_hours[i] = -1.0;
+    week->pos_total_earnings[i] = -1.0;
+  }
+    
   week->total_hours        = -1.0;
   week->total_earnings     = -1.0;
   return week;
@@ -313,6 +324,14 @@ whm_week_T* whm_init_week_type(void)
 	}
       free(week->day);
       week->day = NULL;
+    }
+    if (week->pos_total_hours) {
+      free(week->pos_total_hours);
+      week->pos_total_hours = NULL;
+    }
+    if (week->pos_total_earnings) {
+      free(week->pos_total_earnings);
+      week->pos_total_earnings = NULL;
     }
     free(week);
     week = NULL;
@@ -332,6 +351,14 @@ void whm_free_week_type(whm_week_T *week)
 	whm_free_day_type(week->day[i]);
 	week->day[i] = NULL;
       }
+    if (week->pos_total_hours) {
+      free(week->pos_total_hours);
+      week->pos_total_hours = NULL;
+    }
+    if (week->pos_total_earnings) {
+      free(week->pos_total_earnings);
+      week->pos_total_earnings = NULL;
+    }
     free(week->day);
     week->day = NULL;
   }
@@ -354,6 +381,14 @@ whm_sheet_T* whm_init_sheet_type(void)
     goto errjmp;
   }
   /* 8: 1 for each week days + 1 for monthly totals. */
+  if ((sheet->day_total_hours = malloc(8 * sizeof(double))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  if ((sheet->day_total_earnings = malloc(8 * sizeof(double))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
   if ((sheet->day_pos_hours = malloc(8 * sizeof(double*))) == NULL){
     WHM_ERRMESG("Malloc");
     goto errjmp;
@@ -382,11 +417,14 @@ whm_sheet_T* whm_init_sheet_type(void)
       WHM_ERRMESG("Whm_init_week_type");
       goto errjmp;
     }
-  for (c = 0; c < 8; c++)
+  for (c = 0; c < 8; c++){
     for (i = 0; i < WHM_DEF_NUMOF_POSITIONS; i++){
       sheet->day_pos_hours[c][i] = -1.0;
       sheet->day_pos_earnings[c][i] = -1.0;
     }
+    sheet->day_total_hours[c] = -1.0;
+    sheet->day_total_earnings[c] = -1.0;
+  }
   sheet->year  = -1;
   sheet->month = -1;
   return sheet;
@@ -419,6 +457,14 @@ whm_sheet_T* whm_init_sheet_type(void)
 	}
       free(sheet->week);
       sheet->week = NULL;
+    }
+    if (sheet->day_total_hours){
+      free(sheet->day_total_hours);
+      sheet->day_total_hours = NULL;
+    }
+    if (sheet->day_total_earnings){
+      free(sheet->day_total_earnings);
+      sheet->day_total_earnings = NULL;
     }
     if (sheet->path){
       free(sheet->path);
@@ -463,6 +509,18 @@ void whm_free_sheet_type(whm_sheet_T *sheet)
       }
     free(sheet->week);
     sheet->week = NULL;
+  }
+  if (sheet->day_total_hours){
+    free(sheet->day_total_hours);
+    sheet->day_total_hours = NULL;
+  }
+  if (sheet->day_total_earnings){
+    free(sheet->day_total_earnings);
+      sheet->day_total_earnings = NULL;
+  }
+  if (sheet->path) {
+    free(sheet->path);
+    sheet->path = NULL;
   }
   free(sheet);
 
