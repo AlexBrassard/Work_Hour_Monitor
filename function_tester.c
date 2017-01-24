@@ -8,49 +8,11 @@
 int main (int argc, char **argv)
 {
 
-  FILE *stream = NULL;
-  char *string = NULL;
-  char *new_string = NULL;
-  int i = 0, c = 0;
-
-
-  if ((string = calloc(WHM_HOUR_SHEET_SIZE, sizeof(char))) == NULL){
-    WHM_ERRMESG("Calloc");
-    return -1;
-  }
-  if ((new_string = calloc(WHM_HOUR_SHEET_SIZE, sizeof(char))) == NULL){
-    WHM_ERRMESG("Calloc");
-    return -1;
-  }
-
-  if ((stream = fopen("/home/lappop/.whm.d/SLB.d/2017/SLB_Janvier.sheet", "r")) == NULL){
-    WHM_ERRMESG("Fopen");
-    return -1;
-  }
-
-  fread(string, sizeof(char), WHM_HOUR_SHEET_SIZE, stream);
-  if (ferror(stream)) {
-    WHM_ERRMESG("Fread");
-    return -1;
-  }
-
-  while (string[i] != '\0') {
-    if (string[i] == NUMBER) whm_skip_comments(string, &i, 0);
-    else if (string[i] == SLASH)
-      if (string[i+1] != '\0'){
-	if (string[i+1] == SLASH) {whm_skip_comments(string, &i, 0);}
-	else if (string[i+1] == STAR) {
-	  if (whm_skip_comments(string, &i, 1)!=0){
-	    WHM_ERRMESG("Whm_skip_comments");
-	    return -1;
-	  }
-	}
-      }
-    new_string[c] = string[i];
-    ++i;
-    ++c;
-  }
-  printf ("string:\n%s\n\nnew_string:\n%s\n\n", string, new_string);
+  whm_time_T *time_o = NULL;
+  whm_config_T **configs = NULL;
+  whm_sheet_T **sheets = NULL;
+  
+  
 
   return 0;
 

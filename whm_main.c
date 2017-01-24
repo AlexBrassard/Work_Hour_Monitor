@@ -19,6 +19,7 @@ int main(int argc, char **argv)
 {
   FILE *stream = NULL;
   whm_config_T **configs = NULL;
+  whm_sheet_T ** sheets = NULL;
   whm_time_T *time_o = NULL;
   int i = 0, c_ind = 0;
   char config_bkup_name[WHM_MAX_PATHNAME_S];
@@ -34,6 +35,15 @@ int main(int argc, char **argv)
       WHM_ERRMESG("Whm_init_config_type");
       goto errjmp;
     }
+  if ((sheets = malloc(WHM_MAX_CONFIG_ENTRIES * sizeof(whm_sheet_T*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  for (i = 0; i < WHM_MAX_CONFIG_ENTRIES; i++)
+    if ((sheets[i] = whm_init_sheet_type()) == NULL){
+      WHM_ERRMESG("Whm_init_sheet_type");
+      goto errjmp;
+    }
   /* Initialize and fill the whm_time_T time object. */
   if ((time_o = whm_init_time_type()) == NULL){
     WHM_ERRMESG("Whm_init_time_type");
@@ -45,7 +55,7 @@ int main(int argc, char **argv)
   }
 
   /* 
-   * WHM_WORKING_DIRECTORY and WHM_CONFIGURATION_FILE are in whm.h 
+   * WHM_WORKING_DIRECTORY and WHM_CONFIGURATION_FILE are in whm_sysdep.h 
    * If we can't open the program's working directory, create it.
    */
   if ((stream = fopen(WHM_WORKING_DIRECTORY, "r")) == NULL){
@@ -100,6 +110,27 @@ int main(int argc, char **argv)
       goto errjmp;
     }
 
+  /* 
+   * Note !
+   * Don't read the hour sheets now. _parse_options needs to be able
+   * to selectively open sheets so filling the array now isn't helping.
+   * Once _parse_options is finished, all sheets opened must be updated and written
+   * to disk and closed. _automatic_mode's job is to open all config entries' latest sheet
+   * to check if it's up to date and if not, update it.
+   */
+
+  /* TEST ONLY: */
+  char new_path[WHM_MAX_PATHNAME_S];
+  if (whm_make_sheet_path(new_path, time_o, configs[0]) == NULL){
+    WHM_ERRMESG("Whm_make_sheet_path");
+    goto errjmp;
+  }
+  if (whm_read_sheet(new_path, configs[0], time_o, sheets[0]) != 0){
+    WHM_ERRMESG("Whm_read_sheet");
+    goto errjmp;
+  }
+
+  
   if (argc > 1){ /* There might be options. */
     /* Use whm_parse_options() to execute options. */
     ;
@@ -142,6 +173,15 @@ int main(int argc, char **argv)
     free(configs);
     configs = NULL;
   }
+  if (sheets){
+    for (i = 0; i < WHM_MAX_CONFIG_ENTRIES; i++)
+      if (sheets[i]) {
+	whm_free_sheet_type(sheets[i]);
+	sheets[i] = NULL;
+      }
+    free(sheets);
+    sheets = NULL;
+  }
   if (time_o){
     whm_free_time_type(time_o);
     time_o = NULL;
@@ -162,6 +202,15 @@ int main(int argc, char **argv)
       }
     free(configs);
     configs = NULL;
+  }
+  if (sheets){
+    for (i = 0; i < WHM_MAX_CONFIG_ENTRIES; i++)
+      if (sheets[i]) {
+	whm_free_sheet_type(sheets[i]);
+	sheets[i] = NULL;
+      }
+    free(sheets);
+    sheets = NULL;
   }
   if (time_o){
     whm_free_time_type(time_o);
@@ -251,5 +300,19 @@ void whm_PRINT_sheet(whm_sheet_T *sheet, whm_config_T *config)
 } /* whm_PRINT_sheet() */
 
 
+/* Print the content of a whm_queue_T type object. */
+void whm_PRINT_queue(whm_queue_T *queue)
+{
+  size_t i = 0;
+  if (!queue) return;
 
+  fprintf(stderr, "Is empty: %zu\nString lenght: %zu\nTop index: %d\nIndex: %d\n",
+	  queue->is_empty, queue->string_lenght,
+	  queue->top_index, queue->index);
+  while (i < (size_t)queue->index){
+    fprintf(stderr, "string[%zu]: %s\n", i, queue->string[i]);
+    ++i;
+  }
+  fprintf(stderr, "\n");
 
+} /* whm_PRINT_queue() */

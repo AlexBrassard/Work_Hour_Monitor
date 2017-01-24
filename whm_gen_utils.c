@@ -159,11 +159,13 @@ char* whm_get_string(whm_queue_T *queue)
   }
   if (queue->index <= 0) {
     errno = WHM_EMPTYQUEUE;
+    queue->is_empty = 1;
     return NULL;
   }
 
   if (queue->index == 1){
     queue->index--;
+    queue->is_empty = 1;
     return queue->string[0];
   }
 
@@ -180,7 +182,7 @@ char* whm_get_string(whm_queue_T *queue)
 
 int whm_set_string(whm_queue_T *queue, char *value)
 {
-  if (!queue || !value) {
+  if (!queue || !value || value[0] == '\0') {
     errno = EINVAL;
     return -1;
   }
@@ -194,8 +196,9 @@ int whm_set_string(whm_queue_T *queue, char *value)
     WHM_ERRMESG("S_strcpy");
     return -1;
   }
+  queue->is_empty = 0;
   queue->index++;
-  /* Not sure the following line is good practice... */
+  /*  Not sure the following line is good practice... */
   memset(value, '\0', strlen(value));
 
   return 0;

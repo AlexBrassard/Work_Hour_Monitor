@@ -8,7 +8,7 @@
 # GCC compile flags
 
 GNUCC = gcc
-GNUCFLAGS = -g3 -ggdb -O2 -std=c99 -D_POSIX_C_SOURCE=200809L -Wno-format -Wall \
+GNUCFLAGS = -g3 -ggdb -O0 -std=c99 -D_POSIX_C_SOURCE=200809L -Wno-format -Wall \
             -Wextra -Wstrict-prototypes -Wno-unused-variable -Wno-unused-parameter \
             -pedantic -fsanitize=signed-integer-overflow
 

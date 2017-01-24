@@ -1,3 +1,5 @@
-1 - s_strstr() which would mimic the standard strstr() adding to it s_strcmp() like flags.
+
+
+Optional - s_strstr() which would mimic the standard strstr() adding to it s_strcmp() like flags.
 
 Optional - Review and "modernise" my own pseudocoding rules. (Somewhere in ~/text_files).

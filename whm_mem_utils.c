@@ -70,7 +70,7 @@ whm_queue_T* whm_init_queue_type(int top_index, size_t elem_size)
   queue->index = 0;
   queue->top_index = top_index-1; /* -1: arrays start at 0. */
   queue->string_lenght = elem_size;
-  queue->is_empty = 0;
+  queue->is_empty = 1;
   return queue;
 
  errjmp:

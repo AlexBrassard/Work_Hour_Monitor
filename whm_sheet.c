@@ -377,6 +377,12 @@ int whm_read_sheet(char *pathname,
     WHM_ERRMESG("Fopen");
     return -1;
   }
+  if (s_strcpy(sheet->path, pathname, WHM_MAX_PATHNAME_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+  sheet->year = atoi(time_o->year);
+  sheet->month = atoi(time_o->month);
   if ((content = calloc(WHM_HOUR_SHEET_SIZE, sizeof(char))) == NULL){
     WHM_ERRMESG("Calloc");
     goto errjmp;
@@ -389,7 +395,15 @@ int whm_read_sheet(char *pathname,
   fclose(stream);
   stream = NULL;
 
-  /* Call whm_parse_sheet() now. */
+  if (whm_parse_sheet_cal(config, sheet, content) == -1){
+    WHM_ERRMESG("Whm_parse_sheet_cal");
+    goto errjmp;
+  }
+  if (content){
+    free(content);
+    content = NULL;
+  }
+  return 0;
 
 
  errjmp:
@@ -406,17 +420,86 @@ int whm_read_sheet(char *pathname,
 } /* whm_read_sheet() */
 
 
+/* Fill a whm_sheet_T object with the given queue's data. */
+int whm_queue_to_sheet(whm_config_T *config,
+		       whm_queue_T *queue,
+		       whm_sheet_T *sheet,
+		       int line_count,
+		       int week_ind,
+		       int pos_ind)
+{
+  int day_ind = 0;
+  if (!sheet || !config
+      || !queue || line_count < 0
+      || week_ind < 0 || pos_ind < 0){
+    errno = EINVAL;
+    return -1;
+  }
+
+  /* 
+   * Queue's content depends on the line number:
+   * Line 0:                          the week number.
+   * Line 1:                          the dates.
+   * Line 2 to (numof_positions*2)+1: hours/cash of each positions.
+   * Line numof_positions*2+2:        total hours.
+   * Line (numof_positions*2)+3:      total earnings.
+
+   * ->numof_positions is garanteed to be at most WHM_DEF_NUMOF_POSITIONS (24 atm).
+   * So long as WHM_DEF_NUMOF_POSITIONS is smaller than INT_MAX, casts are good.
+   */
+  if (line_count == 0) {
+    sheet->week[week_ind]->week_number = atoi(whm_get_string(queue));
+  }
+  else if (line_count == 1) {
+    for (day_ind = 0; day_ind < 7; day_ind++)
+      sheet->week[week_ind]->day[day_ind]->date = atoi(whm_get_string(queue));
+  }
+  else if (line_count > 1 && line_count < (int)(config->numof_positions*2)+2) {
+    /* 
+     * Cause of the way hour sheets are arranged, 
+     * hours are on even numbered lines, while
+     * earnings are on uneven numbered lines.
+     */
+    if (line_count % 2){
+      for (day_ind = 0; day_ind < 7; day_ind++)
+	sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = atof(whm_get_string(queue));
+      sheet->week[week_ind]->pos_total_earnings[pos_ind] = atof(whm_get_string(queue));
+    }
+    else{
+      for (day_ind = 0; day_ind < 7; day_ind++)
+	sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(whm_get_string(queue));
+      sheet->week[week_ind]->pos_total_hours[pos_ind] = atof(whm_get_string(queue));
+    }
+  }
+  else if (line_count == (int)(config->numof_positions*2)+2){
+    for (day_ind = 0; day_ind < 7; day_ind++)
+      sheet->week[week_ind]->day[day_ind]->total_hours = atof(whm_get_string(queue));
+    sheet->week[week_ind]->total_hours = atof(whm_get_string(queue));
+  }
+  else if (line_count == (int)(config->numof_positions*2)+3){
+    for (day_ind = 0; day_ind < 7; day_ind++)
+      sheet->week[week_ind]->day[day_ind]->total_earnings = atof(whm_get_string(queue));
+    sheet->week[week_ind]->total_earnings = atof(whm_get_string(queue));
+  }
+  else {
+    errno = WHM_INVALIDELEMCOUNT;
+    return -1;
+  }
+
+
+  return 0;
+
+} /* whm_queue_to_sheet() */
+
+
 /* Parse the content of the given hour sheet content. */
-int whm_parse_sheet_cal(whm_sheet_T *sheet,
-			whm_config_T *config,
+int whm_parse_sheet_cal(whm_config_T *config,
+			whm_sheet_T *sheet,
 			char *content)
 {
   int    line_count = 0;
   int    day_ind  = 0, pos_ind = 0, week_ind = 0;
   int    cont_ind = 0, temp_ind = 0;
-  size_t numof_lines_bpos = 2;                          /* Number of lines before positions.  */
-  size_t numof_lines_apos = 2;                          /* Number of lines after positions.   */
-  size_t numof_lines_pos  = config->numof_positions*2;  /* Number of lines for the positions. */
   whm_queue_T *queue = NULL;
   char   temp[WHM_NAME_STR_S];
 
@@ -428,7 +511,9 @@ int whm_parse_sheet_cal(whm_sheet_T *sheet,
     WHM_ERRMESG("Whm_init_queue_type");
     return -1;
   }
-  
+
+  /* To remove the 'use of uninitialized value' from valgrind. */
+  memset(temp, '\0', WHM_NAME_STR_S);
   /* 
    * Only register the digits and dots characters. 
    * The only way to reach the bottom of the loop is 
@@ -456,7 +541,7 @@ int whm_parse_sheet_cal(whm_sheet_T *sheet,
 	continue;
       }
       /* Multi-lines, C89-style comments. */
-      else if (content[cont_ind] != '\0' && content[cont_ind] == STAR){
+      else if (content[cont_ind+1] != '\0' && content[cont_ind+1] == STAR){
 	if (whm_skip_comments(content, &cont_ind, 1) != 0){
 	  WHM_ERRMESG("Whm_skip_comments");
 	  goto errjmp;
@@ -483,14 +568,23 @@ int whm_parse_sheet_cal(whm_sheet_T *sheet,
 	temp_ind = 0;
       }
       if (queue->is_empty) continue;
-      ; /* Call whm_queue_to_sheet() here. */
+      if (pos_ind >= (int)config->numof_positions) pos_ind = 0;
+      if (whm_queue_to_sheet(config, queue, sheet,
+			     line_count, week_ind,
+			     ((line_count > 1 && line_count < (int)(config->numof_positions*2)-1)
+			      ? pos_ind++ : 0)) != 0){
+	WHM_ERRMESG("Whm_queue_to_sheet");
+	goto errjmp;
+      }
+      ++line_count;
       if (content[cont_ind] == NEWLINE){
 	++cont_ind;
 	if (++week_ind >= 6) {
 	  /* Call whm_parse_sheet_cumul() here then break. We're done. */
 	  break;
 	}
-      }      
+	line_count = 0;
+      }
       continue;
     }
 
@@ -509,6 +603,22 @@ int whm_parse_sheet_cal(whm_sheet_T *sheet,
       }
       continue;
     }
+
+    /* 
+     * When finding a dash as in '--.--' it means no values,
+     * internaly whm is expecting -1.0 when there's no values.
+     */
+    if (content[cont_ind] == DASH){
+      do {
+	++cont_ind;
+      } while (content[cont_ind] != SPACE && content[cont_ind] != NEWLINE);
+      if (s_strcpy(temp, (char*)WHM_NO_VALUES, WHM_NAME_STR_S) == NULL){
+	WHM_ERRMESG("S_strcpy");
+	goto errjmp;
+      }
+      temp_ind = strlen(temp)+1;
+      continue;
+    }
     
     /* Save the dot or digit character into temp[temp_ind]. Skip anything else. */
     if (isdigit(content[cont_ind]) ||  content[cont_ind] == DOT)
@@ -518,7 +628,12 @@ int whm_parse_sheet_cal(whm_sheet_T *sheet,
     ++cont_ind;
   }
 
-       
+  if (queue){
+    whm_free_queue_type(queue);
+    queue = NULL;
+  }
+
+  return 0;
   
  errjmp:
   if (queue){

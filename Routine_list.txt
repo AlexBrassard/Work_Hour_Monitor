@@ -68,10 +68,10 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -C-----	  whm_print_sheet_head       whm_sheet.c	   Print a header message into a new hour sheet.
 -C-----	  whm_print_sheet_cal        whm_sheet.c	   Print the calendar part of an hour sheet.
 -C-----	  whm_print_sheet_cumul	     whm_sheet.c	   Print the cumulatives part of an hour sheet.
-------A	  whm_read_sheet	     whm_sheet.c	   Read an existing hour sheet.
-------A	  whm_parse_sheet_cal	     whm_sheet.c	   Parse the calendar content read from an hour sheet.
+-C-----	  whm_read_sheet	     whm_sheet.c	   Read an existing hour sheet.
+-C-----	  whm_parse_sheet_cal	     whm_sheet.c	   Parse the calendar content read from an hour sheet.
 -------	  whm_parse_sheet_cumul	     whm_sheet.c	   Parse the cumulatives content read from an hour sheet.
--------	  whm_queue_to_sheet	     whm_sheet.c	   Empty a working queue (whm_queue_T) into a whm_sheet_T* object.
+-C-----	  whm_queue_to_sheet	     whm_sheet.c	   Empty a working queue (whm_queue_T) into a whm_sheet_T* object.
 -C-----	  whm_write_sheet	     whm_sheet.c	   Write the given hour sheet to the given stream.
 -C-----	  whm_make_sheet_path	     whm_sheet.c	   Build a new sheet's absolute pathname.
 -----T-	  whm_rm_sheet		     whm_sheet.c	   Delete an existing hour sheet.

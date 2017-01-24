@@ -57,6 +57,9 @@
 
 # define WHM_INPUTDONE             -2222         /* Used by whm_ask_user to signify input is done. */
 
+/* Used when finding an entry with no values in an hour sheet. */
+static const char WHM_NO_VALUES[]        = "-1.0";
+
 /* The program's name. */
 static const char WHM_PROGRAM_NAME[]     = "whm";
 
@@ -347,11 +350,25 @@ int            whm_write_sheet       (FILE *stream,       /* Write the given she
 				      whm_config_T *config,
 				      whm_time_T *time_o,
 				      whm_sheet_T *sheet);
+int            whm_read_sheet        (char *pathname,     /* Read the hour sheet living at pathname.                       */
+				      whm_config_T *config,
+				      whm_time_T *time_o,
+				      whm_sheet_T *sheet);
+int            whm_parse_sheet_cal   (whm_config_T *config, /* Parse the calendar part of an hour sheet.                   */
+				      whm_sheet_T *sheet,
+				      char *content);
+int            whm_queue_to_sheet    (whm_config_T *config, /* Empty the given queue in the given sheet object.            */
+				      whm_queue_T *queue,
+				      whm_sheet_T *sheet,
+				      int line_count,
+				      int week_ind,
+				      int pos_ind);
 
 
 void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
 void whm_PRINT_sheet(whm_sheet_T *sheet,                   /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
 		     whm_config_T *config);
+void whm_PRINT_queue(whm_queue_T *queue);                  /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
 /*** MACROS ***/
 
 /* Remove a trailing newline. */
