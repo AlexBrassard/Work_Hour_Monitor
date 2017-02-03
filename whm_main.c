@@ -121,6 +121,7 @@ int main(int argc, char **argv)
 
   /* TEST ONLY: */
   char new_path[WHM_MAX_PATHNAME_S];
+  FILE *sheet_stream = NULL;
   if (whm_make_sheet_path(new_path, time_o, configs[0]) == NULL){
     WHM_ERRMESG("Whm_make_sheet_path");
     goto errjmp;
@@ -129,7 +130,23 @@ int main(int argc, char **argv)
     WHM_ERRMESG("Whm_read_sheet");
     goto errjmp;
   }
-
+  if (whm_update_sheet(configs[0], sheets[0]) != 0){
+    WHM_ERRMESG("Whm_update_sheet");
+    goto errjmp;
+  }
+  if ((sheet_stream = fopen(new_path, "w")) == NULL){
+    WHM_ERRMESG("Fopen");
+    goto errjmp;
+  }
+  if (whm_write_sheet(sheet_stream, configs[0],
+		      time_o, sheets[0]) != 0) {
+    WHM_ERRMESG("Whm_write_sheet");
+    goto errjmp;
+  }
+  fclose(sheet_stream);
+  sheet_stream = NULL;
+  
+  
   
   if (argc > 1){ /* There might be options. */
     /* Use whm_parse_options() to execute options. */
@@ -143,9 +160,9 @@ int main(int argc, char **argv)
    * Before making any modifications to the configuration file, do a backup. 
    * This backup is removed only after the configuration file is written to disk.
    */
-  if (whm_create_backup(WHM_CONFIGURATION_FILE,
+  if (whm_new_backup(WHM_CONFIGURATION_FILE,
 			config_bkup_name) == NULL){
-    WHM_ERRMESG("Whm_create_backup");
+    WHM_ERRMESG("Whm_new_backup");
     goto errjmp;
   }
 
@@ -158,8 +175,8 @@ int main(int argc, char **argv)
   }
 
   /* Remove the configuration file's backup file. */
-  if (whm_delete_backup(config_bkup_name) != 0){
-    WHM_ERRMESG("Whm_remove_backup");
+  if (whm_rm_backup(config_bkup_name) != 0){
+    WHM_ERRMESG("Whm_rm_backup");
     goto errjmp;
   }
   
@@ -227,7 +244,7 @@ int main(int argc, char **argv)
 /* Helper functions to be called only by, and within GDB. */
 void whm_PRINT_config(whm_config_T *config)
 {
-  size_t i = 0;
+  int i = 0;
   if (!config) return ;
   fprintf (stderr, "\nStatus: %zu\nEmployer: %s\nWork Dir: %s\nNumber of positions: %zu\n",
 	   config->status, config->employer,
@@ -251,7 +268,7 @@ void whm_PRINT_config(whm_config_T *config)
 void whm_PRINT_sheet(whm_sheet_T *sheet, whm_config_T *config)
 {
   int i = 0, b = 0;
-  size_t c = 0;
+  int c = 0;
 
   if (!sheet || !config) return;
 

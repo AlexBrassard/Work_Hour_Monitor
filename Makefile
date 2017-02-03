@@ -44,4 +44,4 @@ whm_mem_utils.o : whm_mem_utils.c ${HEADERS}
 
 .PHONY : clean
 clean :
-	rm -f *.o PROGNAME
+	rm -f *.o ${PROGNAME}

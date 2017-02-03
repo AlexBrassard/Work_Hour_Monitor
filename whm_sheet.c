@@ -19,7 +19,7 @@
  * informations are kept in memory until whm_parse_options() and
  * whm_automatic_mode() are finished performing their operations.
  */
-int whm_create_sheet(whm_sheet_T  *sheet,
+int whm_new_sheet(whm_sheet_T  *sheet,
 		     size_t       *sheet_ind, /* First free element of **sheets. */
 		     whm_config_T *config,
 		     whm_time_T   *time_o)
@@ -76,7 +76,7 @@ int whm_create_sheet(whm_sheet_T  *sheet,
     
   return 0;
 
-} /* whm_create_sheet() */
+} /* whm_new_sheet() */
 
 
 /*
@@ -158,7 +158,8 @@ int whm_print_sheet_cal(FILE *stream,
 			whm_time_T *time_o,
 			whm_sheet_T *sheet)
 {
-  size_t week_ind = 0, day_ind = 0, pos_ind = 0;
+  size_t week_ind = 0, day_ind = 0;
+  int pos_ind = 0;
   int line_count = 0;
   char temp[WHM_MAX_PATHNAME_S]; /* s_itoa() needs a temporary buffer. */
   /* -18s: WHM_NAME_STR_S == 18. */
@@ -268,7 +269,8 @@ int whm_print_sheet_cumul(FILE *stream,
 			  whm_time_T *time_o,
 			  whm_sheet_T *sheet)
 {
-  size_t day_ind = 0, pos_ind = 0;
+  size_t day_ind = 0;
+  int pos_ind = 0;
   char temp[WHM_NAME_STR_S]; /* s_ftoa() needs to be fed a buffer. */
 
   if (!stream || !config || !time_o || !sheet){
@@ -395,7 +397,7 @@ int whm_read_sheet(char *pathname,
   fclose(stream);
   stream = NULL;
 
-  if (whm_parse_sheet_cal(config, sheet, content) == -1){
+  if (whm_parse_sheet(config, sheet, content) == -1){
     WHM_ERRMESG("Whm_parse_sheet_cal");
     goto errjmp;
   }
@@ -426,66 +428,99 @@ int whm_queue_to_sheet(whm_config_T *config,
 		       whm_sheet_T *sheet,
 		       int line_count,
 		       int week_ind,
-		       int pos_ind)
+		       int pos_ind,
+		       int day_ind,
+		       int is_cal)
 {
-  int day_ind = 0;
   if (!sheet || !config
       || !queue || line_count < 0
-      || week_ind < 0 || pos_ind < 0){
+      || week_ind < 0 || pos_ind < 0
+      || day_ind < 0){
     errno = EINVAL;
     return -1;
   }
 
-  /* 
-   * Queue's content depends on the line number:
-   * Line 0:                          the week number.
-   * Line 1:                          the dates.
-   * Line 2 to (numof_positions*2)+1: hours/cash of each positions.
-   * Line numof_positions*2+2:        total hours.
-   * Line (numof_positions*2)+3:      total earnings.
-
-   * ->numof_positions is garanteed to be at most WHM_DEF_NUMOF_POSITIONS (24 atm).
-   * So long as WHM_DEF_NUMOF_POSITIONS is smaller than INT_MAX, casts are good.
-   */
-  if (line_count == 0) {
-    sheet->week[week_ind]->week_number = atoi(whm_get_string(queue));
-  }
-  else if (line_count == 1) {
-    for (day_ind = 0; day_ind < 7; day_ind++)
-      sheet->week[week_ind]->day[day_ind]->date = atoi(whm_get_string(queue));
-  }
-  else if (line_count > 1 && line_count < (int)(config->numof_positions*2)+2) {
+  if (is_cal){
     /* 
-     * Cause of the way hour sheets are arranged, 
-     * hours are on even numbered lines, while
-     * earnings are on uneven numbered lines.
+     * Queue's content depends on the line number:
+     * Line 0:                          the week number.
+     * Line 1:                          the dates.
+     * Line 2 to (numof_positions*2)+1: hours/cash of each positions.
+     * Line numof_positions*2+2:        total hours.
+     * Line (numof_positions*2)+3:      total earnings.
+
+     * ->numof_positions is garanteed to be at most WHM_DEF_NUMOF_POSITIONS (24 atm).
+     * So long as WHM_DEF_NUMOF_POSITIONS is smaller than INT_MAX, casts are good.
      */
-    if (line_count % 2){
-      for (day_ind = 0; day_ind < 7; day_ind++)
-	sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = atof(whm_get_string(queue));
-      sheet->week[week_ind]->pos_total_earnings[pos_ind] = atof(whm_get_string(queue));
+    if (line_count == 0) {
+      sheet->week[week_ind]->week_number = atoi(whm_get_string(queue));
     }
-    else{
+    else if (line_count == 1) {
       for (day_ind = 0; day_ind < 7; day_ind++)
-	sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(whm_get_string(queue));
-      sheet->week[week_ind]->pos_total_hours[pos_ind] = atof(whm_get_string(queue));
+	sheet->week[week_ind]->day[day_ind]->date = atoi(whm_get_string(queue));
     }
-  }
-  else if (line_count == (int)(config->numof_positions*2)+2){
-    for (day_ind = 0; day_ind < 7; day_ind++)
-      sheet->week[week_ind]->day[day_ind]->total_hours = atof(whm_get_string(queue));
-    sheet->week[week_ind]->total_hours = atof(whm_get_string(queue));
-  }
-  else if (line_count == (int)(config->numof_positions*2)+3){
-    for (day_ind = 0; day_ind < 7; day_ind++)
-      sheet->week[week_ind]->day[day_ind]->total_earnings = atof(whm_get_string(queue));
-    sheet->week[week_ind]->total_earnings = atof(whm_get_string(queue));
+    else if (line_count > 1 && line_count < (config->numof_positions*2)+2) {
+      /* 
+       * Cause of the way hour sheets are arranged, 
+       * hours are on even numbered lines, while
+       * earnings are on uneven numbered lines.
+       */
+      if (line_count % 2){
+	for (day_ind = 0; day_ind < 7; day_ind++)
+	  sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = atof(whm_get_string(queue));
+	sheet->week[week_ind]->pos_total_earnings[pos_ind] = atof(whm_get_string(queue));
+      }
+      else{
+	for (day_ind = 0; day_ind < 7; day_ind++)
+	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(whm_get_string(queue));
+	sheet->week[week_ind]->pos_total_hours[pos_ind] = atof(whm_get_string(queue));
+      }
+    }
+    else if (line_count == (config->numof_positions*2)+2){
+      for (day_ind = 0; day_ind < 7; day_ind++)
+	sheet->week[week_ind]->day[day_ind]->total_hours = atof(whm_get_string(queue));
+      sheet->week[week_ind]->total_hours = atof(whm_get_string(queue));
+    }
+    else if (line_count == (config->numof_positions*2)+3){
+      for (day_ind = 0; day_ind < 7; day_ind++)
+	sheet->week[week_ind]->day[day_ind]->total_earnings = atof(whm_get_string(queue));
+      sheet->week[week_ind]->total_earnings = atof(whm_get_string(queue));
+    }
+    else {
+      errno = WHM_INVALIDELEMCOUNT;
+      return -1;
+    }
   }
   else {
-    errno = WHM_INVALIDELEMCOUNT;
-    return -1;
+    /* 
+     * Cumulatives:
+     * {
+     *   Line 0: Total hours followed by total earnings per week day, all positions combined.
+     *   Line 1 to numof_positions inclusively: Total hours followed by total earnings per week day, per positions.
+     * } x 7
+     * {
+     *   Line 0: Total hours followed by total earnings for the whole month, all positions combined.
+     *   Line 1 to numof_positions inclusively: Total hours followed by total earnings for the whole month, per positions.
+     * } x 1
+     */
+    if (line_count == 0){
+      sheet->day_total_hours[day_ind] = atof(whm_get_string(queue));
+      sheet->day_total_earnings[day_ind] = atof(whm_get_string(queue));
+    }
+    else if (line_count > 0 && line_count <= (int)config->numof_positions){
+      /* 
+       * Here it's safe to use line_count-1 as position counter since 
+       * it's garanteed no more than 1 line will be before the begining
+       * of positions cumulatives. 
+       */
+      sheet->day_pos_hours[day_ind][line_count-1] = atof(whm_get_string(queue));
+      sheet->day_pos_earnings[day_ind][line_count-1] = atof(whm_get_string(queue));
+    }
+    else {
+      errno = WHM_INVALIDELEMCOUNT;
+      return -1;
+    }    
   }
-
 
   return 0;
 
@@ -493,7 +528,7 @@ int whm_queue_to_sheet(whm_config_T *config,
 
 
 /* Parse the content of the given hour sheet content. */
-int whm_parse_sheet_cal(whm_config_T *config,
+int whm_parse_sheet(whm_config_T *config,
 			whm_sheet_T *sheet,
 			char *content)
 {
@@ -524,7 +559,7 @@ int whm_parse_sheet_cal(whm_config_T *config,
    * without having to terminate the current loop itteration right away.
    * Felt I have to justify myself.
    */
-  while(content[cont_ind] != '\0' && content[cont_ind] != EOF){
+  while(content[cont_ind] != '\0'){
 
     /* 
      * Skip comments. 
@@ -568,11 +603,23 @@ int whm_parse_sheet_cal(whm_config_T *config,
 	temp_ind = 0;
       }
       if (queue->is_empty) continue;
-      if (pos_ind >= (int)config->numof_positions) pos_ind = 0;
+      if (line_count <= 1 || pos_ind >= (int)config->numof_positions) pos_ind = 0;
+      else if ((line_count > 1)
+	       && (line_count < (config->numof_positions*2)+1)
+	       && (line_count % 2)) pos_ind++;
+      /*
+       * When parsing the calendar part, day_ind is calculated by
+       * whm_queue_to_sheet() itself while when parsing the cumulatives
+       * part, this function is handling it.
+       * Even though there are only 7 days in a week, the 8th index is used
+       * to store the monthly total values.
+       */
+      if (day_ind >= 8) day_ind = 0; 
       if (whm_queue_to_sheet(config, queue, sheet,
 			     line_count, week_ind,
-			     ((line_count > 1 && line_count < (int)(config->numof_positions*2)-1)
-			      ? pos_ind++ : 0)) != 0){
+			     pos_ind,
+			     ((week_ind < 6) ? 0 : day_ind++),
+			     ((week_ind < 6) ? 1 : 0)) != 0){ /* 0 When parsing cumulatives, 1 for calendar. */
 	WHM_ERRMESG("Whm_queue_to_sheet");
 	goto errjmp;
       }
@@ -580,8 +627,8 @@ int whm_parse_sheet_cal(whm_config_T *config,
       if (content[cont_ind] == NEWLINE){
 	++cont_ind;
 	if (++week_ind >= 6) {
-	  /* Call whm_parse_sheet_cumul() here then break. We're done. */
-	  break;
+	  /* Call whm_parse_sheet_cumul() here then break. We're done. 
+	     break;*/
 	}
 	line_count = 0;
       }
@@ -643,4 +690,270 @@ int whm_parse_sheet_cal(whm_config_T *config,
   return -1;
   
 
-} /* whm_parse_sheet_cal() */
+} /* whm_parse_sheet() */
+
+
+/*
+ * whm_update_sheet()'s job is to recalculate the missing fields depending
+ * on the information already present. If hours are present, it uses them to
+ * calculate the earnings. If only the earnings are present, hours are calculated from 
+ * them.
+ * Depending on whether it gets paid or not the 4% is also recalculated.
+ */
+int whm_update_sheet(whm_config_T *config,
+		     whm_sheet_T *sheet)
+{
+  int day_ind = 0, week_ind = 0, pos_ind = 0;
+
+  if (!config || !sheet){
+    errno = EINVAL;
+    return -1;
+  }
+
+  /* 
+   * For each date that's not -1,
+   * make sure one of 'hours' or 'earnings' isn't -1 (prioritizing hours).
+   * Calculate (always make sure values aren't -1 before using them): 
+   *  - The money made that day for each positions 
+   *    OR
+   *    The hours made that day for each positions
+   *  - Add each positions' hours and earnings to their respective total of the current date.
+   *  - The current total of hours/earnings + optionaly the 4% of all positions combined.
+   *  - The current total of hours/earnings of each separate positions.
+   * When each days of the sheet has been recalculated
+   *  - The total hours/earning per week day, all positions combined.
+   *  - The total hours/earning per week day, per position.
+   *  - The grand total hours/earnings for this month, all combined.
+   *  - The grand total hours/earnings for this months, per positions.
+   */
+  whm_reset_totals(sheet, config);
+  whm_get_day_totals(sheet, config);
+  whm_get_week_totals(sheet, config);
+  whm_get_sheet_cumuls(sheet, config);
+
+  return 0;
+
+} /* whm_update_sheet() */
+
+
+void whm_reset_totals(whm_sheet_T *sheet,
+		      whm_config_T *config)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+  for (; week_ind < 6; week_ind++) {
+    sheet->week[week_ind]->total_hours = -1.0;
+    sheet->week[week_ind]->total_earnings = -1.0;
+    for (day_ind = 0; day_ind < 7; day_ind++) {
+      sheet->day_total_hours[day_ind] = -1.0;
+      sheet->day_total_earnings[day_ind] = -1.0;
+      sheet->week[week_ind]->day[day_ind]->total_hours = -1.0;
+      sheet->week[week_ind]->day[day_ind]->total_earnings = -1.0;
+      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+	sheet->day_pos_hours[day_ind][pos_ind] = -1.0;
+	sheet->day_pos_earnings[day_ind][pos_ind] = -1.0;
+	sheet->week[week_ind]->pos_total_hours[pos_ind] = -1.0;
+	sheet->week[week_ind]->pos_total_earnings[pos_ind] = -1.0;
+      }
+    }
+  }
+} /* whm_reset_totals() */
+
+
+/* 
+ * No error checks are made on the arguments.
+ * Calculate the totals of hours and earnings for each days of a given sheet.
+ */
+void whm_get_day_totals(whm_sheet_T *sheet,
+			whm_config_T *config)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+
+  for (; week_ind < 6; week_ind++) {
+
+    for (day_ind = 0; day_ind < 7; day_ind++) {
+      /* Remember -1 is always the default value since 0 is perfectly valid. */      
+      if (sheet->week[week_ind]->day[day_ind]->date == -1) continue;
+
+      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+	/* First, check if we either got hours or an amount of money to play with. */
+	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1
+	    && sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] == -1) continue;
+	/* 
+	 * Always prioritize hours but if there's only an amount
+	 * of money present, calculate the number of hours worked from it. 
+	 */
+	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] > -1)
+	  sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] =
+	    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] * config->wages[pos_ind];
+	else if (sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] > 0)
+	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] =
+	    sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] / config->wages[pos_ind];
+	else
+	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = 0;
+
+	/* Update the daily totals. */
+	sheet->week[week_ind]->day[day_ind]->total_hours +=
+	  ((sheet->week[week_ind]->day[day_ind]->total_hours == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] + 1
+	   : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
+	sheet->week[week_ind]->day[day_ind]->total_earnings +=
+	  ((sheet->week[week_ind]->day[day_ind]->total_earnings == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] + 1
+	   : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]);
+      }
+    }
+  }
+      
+} /* whm_get_day_totals() */
+
+
+/*
+ * No error checks are made on the arguments.
+ * Calculate the amount of hours/earnings for each 
+ * weeks of an hour sheet. 
+ */
+void whm_get_week_totals(whm_sheet_T *sheet,
+			 whm_config_T *config)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+
+  for (; week_ind < 6; week_ind++) {
+    for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+      for (day_ind = 0; day_ind < 7; day_ind++) {
+	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1
+	    || sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] == -1) continue;
+
+	sheet->week[week_ind]->pos_total_hours[pos_ind] +=
+	  ((sheet->week[week_ind]->pos_total_hours[pos_ind] == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	   : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
+	sheet->week[week_ind]->pos_total_earnings[pos_ind] +=
+	  ((sheet->week[week_ind]->pos_total_earnings[pos_ind] == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	   : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]);
+      }
+
+      if (sheet->week[week_ind]->pos_total_hours[pos_ind] != -1
+	  && sheet->week[week_ind]->pos_total_earnings[pos_ind] != -1){
+	sheet->week[week_ind]->total_hours +=
+	  ((sheet->week[week_ind]->total_hours == -1)
+	   ? sheet->week[week_ind]->pos_total_hours[pos_ind]+1
+	   : sheet->week[week_ind]->pos_total_hours[pos_ind]);
+	sheet->week[week_ind]->total_earnings +=
+	  ((sheet->week[week_ind]->total_earnings == -1)
+	   ? sheet->week[week_ind]->pos_total_earnings[pos_ind]+1
+	   : sheet->week[week_ind]->pos_total_earnings[pos_ind]);
+      }
+
+    }
+    if (config->do_pay_holiday) sheet->week[week_ind]->total_hours +=
+				  ((sheet->week[week_ind]->total_hours * 4)/100);
+  }
+} /* whm_get_week_totals() */
+
+
+/*
+ * No error checks are made on the arguments.
+ * Calculate the cumulatives per week day and per position for
+ * the current month. 
+ */
+void whm_get_sheet_cumuls(whm_sheet_T *sheet,
+			  whm_config_T *config)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+
+  /* Index 7 is the grand totals for this month. */
+  for (; day_ind < 7; day_ind++) {
+    for (week_ind = 0; week_ind < 6; week_ind++) {
+      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] != -1
+	    && sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] != -1) {
+	  sheet->day_pos_hours[day_ind][pos_ind] +=
+	    ((sheet->day_pos_hours[day_ind][pos_ind] == -1)
+	     ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	     : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
+	  sheet->day_pos_earnings[day_ind][pos_ind] +=
+	    ((sheet->day_pos_earnings[day_ind][pos_ind] == -1)
+	     ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	     : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]);
+	}
+      }
+      if (sheet->week[week_ind]->day[day_ind]->total_hours != -1
+	  && sheet->week[week_ind]->day[day_ind]->total_earnings != -1){
+	sheet->day_total_hours[day_ind] +=
+	  ((sheet->day_total_hours[day_ind] == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->total_hours+1
+	   : sheet->week[week_ind]->day[day_ind]->total_hours);
+	sheet->day_total_earnings[day_ind] +=
+	  ((sheet->day_total_earnings[day_ind] == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->total_earnings+1
+	   : sheet->week[week_ind]->day[day_ind]->total_earnings);
+      }
+    }
+  }
+  for (week_ind = 0; week_ind < 6; week_ind++) {
+    for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+      if (sheet->week[week_ind]->pos_total_hours[pos_ind] != -1
+	  && sheet->week[week_ind]->pos_total_earnings[pos_ind] != -1) {
+	sheet->day_pos_hours[7][pos_ind] +=
+	  ((sheet->day_pos_hours[7][pos_ind] == -1)
+	   ? sheet->week[week_ind]->pos_total_hours[pos_ind]+1
+	   : sheet->week[week_ind]->pos_total_hours[pos_ind]);
+	sheet->day_pos_earnings[7][pos_ind] +=
+	  ((sheet->day_pos_earnings[7][pos_ind] == -1)
+	   ? sheet->week[week_ind]->pos_total_earnings[pos_ind]+1
+	   : sheet->week[week_ind]->pos_total_earnings[pos_ind]);
+      }
+    }
+    if (sheet->week[week_ind]->total_hours != -1
+	&& sheet->week[week_ind]->total_earnings != -1) {
+      sheet->day_total_hours[7] +=
+	((sheet->day_total_hours[7] == -1)
+	 ? sheet->week[week_ind]->total_hours+1
+	 : sheet->week[week_ind]->total_hours);
+      sheet->day_total_earnings[7] +=
+	((sheet->day_total_earnings[7] == -1)
+	 ? sheet->week[week_ind]->total_earnings+1
+	 : sheet->week[week_ind]->total_earnings);
+    }
+  }
+
+} /* whm_get_sheet_cumuls() */
+
+
+
+
+
+
+
+/*
+ * whm_inter_update_sheet() will prompt user to enter the 
+ * number of hours worked for the current day, for all
+ * active companies in the configuration file.
+ * This function is assuming the sheets to update have already been
+ * read in memory before being called.
+
+ **** This functions is mostly to be called only from whm_automatic_mode() ****
+
+ */
+int whm_inter_update_sheet(whm_config_T **configs,
+			   whm_sheet_T **sheets,
+			   whm_time_T *time_o,
+			   int max_ind)
+{
+
+  int c_ind = -1;
+  char answer[WHM_NAME_STR_S];
+
+  if (!configs || !sheets || !time_o || !max_ind){
+    errno = EINVAL;
+    return -1;
+  }
+
+  while (++c_ind < max_ind) {
+    ;
+    /* 
+     * For each positions of each active companies in the configuration file,
+     * ask the user how many hours were worked for the current day.
+     */
+  }

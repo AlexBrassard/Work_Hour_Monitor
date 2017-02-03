@@ -14,8 +14,9 @@
 				/     	              \
 			whm_new_sheet()        whm_read_sheet()
 			        \                     /
-				   \               /
-				      \         /
+                                   \               /
+                                      \         /
+				      
 				           |
 					   |
 			          whm_parse_options()
@@ -28,7 +29,7 @@
 				          \|/
 					   |
 				  whm_automatic_mode()
-			     [Update non-up-to-date sheets]
+			     [Update non-updated sheets]
 				           |
 					   |
 			    whm_backup_file(configuration file)

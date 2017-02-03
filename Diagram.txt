@@ -1,0 +1,30 @@
+whm_get_time()
+
+Check if WHM_WORKING_DIRECTORY exists else create it.
+
+whm_read_config() / whm_new_config().
+
+Initialize an array of whm_config_T* and an array of whm_sheet_T*
+to later store the addresses of those sheets that will need to be written to disk
+along with a pointer to its configuration entry.
+
+For each entry read from the configuration file,
+  whm_new_year_dir() (check if the current year's directory exists else create it.)
+
+whm_parse_options()
+    whm_add_config()  whm_rm_config()  whm_[inter]_modify_config()  whm_list_config_names()  whm_list_config_fields()
+
+
+    whm_rm_sheet()  whm_[inter]_update_sheet()  ...
+    
+
+whm_automatic_mode()
+For each entries of the configuration file:
+    whm_new_bkup()
+    whm_inter_update_sheet()
+    Add a pointer to the whm_sheet_T* and the whm_config_T* of the
+    entry to be written to disk.
+
+For each sheets in the sheet list,
+    whm_write_sheet()
+    whm_rm_bkup()

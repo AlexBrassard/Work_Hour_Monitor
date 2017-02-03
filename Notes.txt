@@ -6,6 +6,33 @@
 TOP
 ----
 Very Important:
+Note: It's ok to do yourself a manual job but..:
+    The hour sheet must be editable by hand, but a user should not
+    have to calculate the amount of money made, whm should.
+    whm_read_sheet() should ensure that when the whole sheet has been
+    parsed and stored into the sheet_T object, all filled hours filed
+    has a their corresponding earning field filled and vice-versa.
+
+    How to determine an hour sheet has been modified, and which fields
+    of the file has been modified?
+    Make a hidden directory: .last_run.d/ that would keeps a double of the
+    latest version of each sheets the program has seen every time is ran.
+    A sheet is first read in memory, then it's double is read and
+    both are compared against each others, adjusting the differences
+    (if old > new then 
+    If nothing has changed whm_update_sheet() isn't called.
+
+    Compare each current days and their doubles if it's the same no calculs must be done but:
+    if earnings are bigger than hours, adjust hours else if hours are bigger than 0 adjust earnings.
+    Each weeks and month data must be reseted before any calcul is to be done on them.
+
+    A list of updated sheets waiting to be written to disk sounds like a good idea.
+
+    What I really want: A user can edit any fields of an hour sheet and whm will adjust the
+    related values accordingly.
+    
+
+Very Important:
 Note: Fail like you were born to fail:
     Any modifications should be written to disk only at the
     very last moment so that when failing due to an error or a strong
@@ -26,6 +53,15 @@ Important:
 Note: Not that twins aren't cool, they're just too confusing:
     When using any of the _modify_config() functions, an additional check
     must be made to make sure no company or position name gets duplicated.
+
+
+Note: Wait till I'm done you little...:
+    I'll wait till the program is finished then add 2 fields to see if I did
+    a good job in making it easy to add informations.
+    These are:
+     . total hours since creation (anciennette, english -> ? )
+     . holiday cash ($ to be paid when going on vacation)
+    
 
 
 Note: Options and their arguments:

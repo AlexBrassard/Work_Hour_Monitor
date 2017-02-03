@@ -218,7 +218,7 @@ int whm_clr_string(whm_queue_T *queue, int index)
 } /* whm_clr_string() */
 
 
-char* whm_create_backup(const char *filename, char *backupname)
+char* whm_new_backup(const char *filename, char *backupname)
 {
   FILE *stream = NULL, *bstream = NULL;
   char *file_content = NULL;
@@ -290,10 +290,10 @@ char* whm_create_backup(const char *filename, char *backupname)
     bstream = NULL;
   }
   return NULL;
-} /* whm_create_backup() */
+} /* whm_new_backup() */
 
 
-int whm_delete_backup(const char *filename)
+int whm_rm_backup(const char *filename)
 {
   if (!filename){
     errno = EINVAL;
@@ -305,7 +305,7 @@ int whm_delete_backup(const char *filename)
     return -1;
   }
   return 0;
-} /* whm_delete_backup() */
+} /* whm_rm_backup() */
 
 
 int whm_ask_user(enum whm_question_type question,
@@ -425,6 +425,10 @@ int whm_ask_user(enum whm_question_type question,
   case FIELD_HOLIDAY_PAY:
     printf("\nRecevez-vous votre 4%% de vacance a chaque paie? [0: non/1: oui]: ");
     break;
+
+  case SHEET_WORKED_HOURS:
+    printf("\nCombien d'heures avez-vous travaillez pour le poste de %s chez %s?: ",
+	   config->positions[pos_ind], config->employer);
 
   default:
     errno = WHM_BADQUESTION;

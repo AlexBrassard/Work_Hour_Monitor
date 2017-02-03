@@ -982,8 +982,7 @@ int whm_list_config_fields(char *company,
 			   int max_config_ind,
 			   whm_config_T **configs)
 {
-  int c_ind = 0;
-  size_t i = 0;
+  int c_ind = 0, i = 0;
   char temp[WHM_NAME_STR_S];
 
   if (!company || max_config_ind < 0 || !configs){
@@ -1029,8 +1028,7 @@ int whm_rm_config(char *company,
 		  int *max_config_ind,
 		  whm_config_T **configs)
 {
-  int c_ind = 0;
-  size_t i = 0;
+  int c_ind = 0, i = 0;
   whm_config_T *temp = NULL;
 
   if (!company || !max_config_ind || !*max_config_ind || !configs){

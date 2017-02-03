@@ -1,8 +1,72 @@
 /*
  *
- * Work Hour Monitor  -  Main function pseudo-code.
+ * Work Hour Monitor  -  Various functions pseudo-codes.
  *
  */
+
+int whm_get_day_totals(whm_sheet_T *new_sheet,
+		       whm_config_T *config)
+
+{
+  For each weeks of new_sheet,
+    For each days of the week,
+      Make sure date isn't -1 else continue.
+      Reset current day's totals to -1.
+      For each positions of config,
+        Compare old_sheet's pos_hours/earnings[pos_ind] against new_sheet pos_hours/earnings[pos_ind]. [no more]
+	If both are equal, don't do anything.
+	If new_sheet's pos_hours/earnings[pos_ind] is equal to -1, don't do anything.
+	else Calculate today's pos_hours/earnings[pos_ind] from new_sheet's data
+	(hours * wage || earnings / wage)
+	
+        If today's pos_hours and pos_earnings aren't -1,
+	  Add each values to their respective totals, making sure these totals
+	  are not equal to -1 and if they are, add one to these values.
+
+}
+
+
+int whm_get_week_totals(whm_sheet_T *new_sheet,
+			whm_config_T *config)
+
+{
+  For each weeks of new_sheet,
+    Reset this week's total_hours/earnings to -1.
+    For each positions of config,
+      Compare old_sheet's pos_total_hours/earnings[pos_ind] against their respective new_sheet values. [no more]
+      If both are equal, don't do anything.
+      Reset pos_total_hours and pos_total_earnings to -1.0.
+      Calculate pos_total_hours/earnings[pos_ind] from new_sheet's data.
+        For each days of the week,
+          If today's total_hours and total_earnings aren't -1,
+	    Add each of day->pos_hours/earnings to their respective week->pos_totals_hours/earnings adding
+	    one if week->pos_total_hours/earnings was -1.
+   
+      If this week's pos_total_hours and pos_total_earnings aren't -1,
+        Add pos_total_hours/earnings[pos_ind] to total_hours/earnings,
+        making sure the totals aren't -1 and if they are add 1 to it.
+        If do_pay_holiday is true, add 4% to the total.
+      Else continue.
+      
+}
+        
+
+int whm_get_sheet_cumuls(whm_sheet_t *old_sheet,
+    		         whm_sheet_T *new_sheet,
+			 whm_config_T *config)
+
+{
+  For each weekdays,
+    reset day_total_hours/earnings to -1.
+    For each weeks,
+      For each positions of config,
+        reset sheet->day_pos_hours/earnings to -1.
+	If day->pos_hours and day->pos_earnings aren't -1,
+          add day->pos_hours/earnings to sheet->day_pos_hours/earnings making sure if it's -1 to add 1 to the value.
+	Else continue.
+      If day->total_hours and day->total_earnings aren't -1,
+        add day->total_hours/earnings to sheet->day_total_hours/earnings making sure if it's -1 to add 1 to the value.
+}
 
 
 int whm_automatic_mode(whm_config_T *config)

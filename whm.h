@@ -69,6 +69,9 @@ static const char WHM_BKUP_SUFFIX[]      = ".whmbkup";
 /* Suffix appended to every newly created hour sheet. */
 static const char WHM_SHEET_SUFFIX[]     = ".sheet";
 
+/* Prefix appended to every "last seen sheet". */
+static const char WHM_LAST_SEEN_SUFFIX[] = ".LS_";
+
 /* Every supported short options. */
 static const char WHM_SHORT_OPTIONS[][3] = {"-p", "-u", "-a", "-d", "-m", "-l", "-h" };
 
@@ -147,7 +150,7 @@ typedef struct whm_config_type {
   size_t                   status;               /* 0: inactive, no reading is made. > 0: active.               */
   char                     *employer;            /* The name of the employer for this entry.                    */
   char                     *working_directory;   /* This company's hour sheet directory.                        */
-  size_t                   numof_positions;      /* Number of different positions occupied in this company.     */
+  int                      numof_positions;      /* Number of different positions occupied in this company.     */
   char                     **positions;          /* The name of all positions occupied in this company.         */
   double                   *wages;               /* Wages for each positions.                                   */
   char                     *night_prime;         /* > 0: The exact amount; 0: night shift recorded, no prime; < 0: not recorded. */
@@ -232,7 +235,9 @@ enum whm_question_type {
   FIELD_POSITION,
   FIELD_WAGE,
   FIELD_NIGHT_PRIME,
-  FIELD_HOLIDAY_PAY
+  FIELD_HOLIDAY_PAY,
+  /* When updating an hour sheet. */
+  SHEET_WORKED_HOURS
 
 };
 
@@ -274,9 +279,9 @@ int            whm_set_string      (whm_queue_T *queue,    /* Add a string to qu
 				    char *value);
 int            whm_clr_string      (whm_queue_T *queue,    /* Clear a string from queue.                                   */
 				    int index);
-char*          whm_create_backup   (const char *filename,  /* Create a backup of the given file.                           */
+char*          whm_new_backup   (const char *filename,  /* Create a backup of the given file.                           */
 				    char *backupname);
-int            whm_delete_backup   (const char *filename); /* Delete the given backup file.                                */
+int            whm_rm_backup   (const char *filename); /* Delete the given backup file.                                */
 int            whm_ask_user        (enum whm_question_type questions, /* Ask a question to the user via stdin.             */
 				    char *answer,
 				    size_t answer_s,
@@ -296,7 +301,7 @@ int            whm_new_config      (const char *pathname,  /* Create a new confi
 				    whm_config_T **configs);
 int            whm_add_config      (int *config_index,     /* Add a company to the configuration file.                     */
 				    whm_config_T **configs);
-int            whm_delete_config   (char *company,         /* Delete the given company from the configuration file.        */
+int            whm_rm_config   (char *company,         /* Delete the given company from the configuration file.        */
 				    int *max_config_ind,
 				    whm_config_T **configs);
 int            whm_read_config     (FILE *stream,          /* Read the configuration file.                                 */
@@ -313,7 +318,7 @@ int            whm_modify_config   (char *company,         /* Update one field o
 				    whm_config_T **configs);
 int            whm_inter_modify_config(int max_config_ind, /* Interactively modify an entry of the configuration file. */
 				       whm_config_T **configs);
-int            whm_list_config_names(int max_config_ind,   /* List names of active companies in the configuration file. */
+int            whm_list_config_names (int max_config_ind,  /* List names of active companies in the configuration file. */
 				     whm_config_T **configs);
 int            whm_list_config_fields(char *company,       /* List a given company's configuration file modifiable entries. */
 				      int max_config_ind,
@@ -328,7 +333,7 @@ int            whm_get_field_name    (char *string,        /* Get the whm_config
 				      whm_config_T **configs);
 
 /* whm_sheet.c   */
-int            whm_create_sheet      (whm_sheet_T *sheet,  /* Fill the structure representing an hour sheet.               */
+int            whm_new_sheet      (whm_sheet_T *sheet,  /* Fill the structure representing an hour sheet.               */
 				      size_t *sheet_ind,
 				      whm_config_T *config,
 				      whm_time_T *time_o);
@@ -354,7 +359,7 @@ int            whm_read_sheet        (char *pathname,     /* Read the hour sheet
 				      whm_config_T *config,
 				      whm_time_T *time_o,
 				      whm_sheet_T *sheet);
-int            whm_parse_sheet_cal   (whm_config_T *config, /* Parse the calendar part of an hour sheet.                   */
+int            whm_parse_sheet       (whm_config_T *config, /* Parse the calendar part of an hour sheet.                   */
 				      whm_sheet_T *sheet,
 				      char *content);
 int            whm_queue_to_sheet    (whm_config_T *config, /* Empty the given queue in the given sheet object.            */
@@ -362,7 +367,19 @@ int            whm_queue_to_sheet    (whm_config_T *config, /* Empty the given q
 				      whm_sheet_T *sheet,
 				      int line_count,
 				      int week_ind,
-				      int pos_ind);
+				      int pos_ind,
+				      int day_ind,
+				      int is_cal);
+int             whm_update_sheet     (whm_config_T *config, /* Update all calculated values of an hour sheet.              */
+				      whm_sheet_T *sheet);
+void            whm_reset_totals     (whm_sheet_T *sheet,  /* Reset all sheet totals to -1.0 .                             */
+				      whm_config_T *config);
+void            whm_get_day_totals   (whm_sheet_T *sheet,  /* Calculate daily amounts of hours and earnings.               */
+				      whm_config_T *config);
+void            whm_get_week_totals  (whm_sheet_T *sheet,  /* Calculate weekly amounts of hours and earnings.              */
+				      whm_config_T *config);
+void            whm_get_sheet_cumuls (whm_sheet_T *sheet,  /* Calculate monthly cumulatives.                               */
+				      whm_config_T *config);
 
 
 void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
