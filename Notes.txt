@@ -6,37 +6,17 @@
 TOP
 ----
 Very Important:
-Note: It's ok to do yourself a manual job but..:
-    The hour sheet must be editable by hand, but a user should not
-    have to calculate the amount of money made, whm should.
-    whm_read_sheet() should ensure that when the whole sheet has been
-    parsed and stored into the sheet_T object, all filled hours filed
-    has a their corresponding earning field filled and vice-versa.
-
-    How to determine an hour sheet has been modified, and which fields
-    of the file has been modified?
-    Make a hidden directory: .last_run.d/ that would keeps a double of the
-    latest version of each sheets the program has seen every time is ran.
-    A sheet is first read in memory, then it's double is read and
-    both are compared against each others, adjusting the differences
-    (if old > new then 
-    If nothing has changed whm_update_sheet() isn't called.
-
-    Compare each current days and their doubles if it's the same no calculs must be done but:
-    if earnings are bigger than hours, adjust hours else if hours are bigger than 0 adjust earnings.
-    Each weeks and month data must be reseted before any calcul is to be done on them.
-
-    A list of updated sheets waiting to be written to disk sounds like a good idea.
-
-    What I really want: A user can edit any fields of an hour sheet and whm will adjust the
-    related values accordingly.
-    
-
-Very Important:
 Note: Fail like you were born to fail:
     Any modifications should be written to disk only at the
     very last moment so that when failing due to an error or a strong
-    will to cancel everything, not everything gets messed up.
+    will to cancel everything, not everything gets messed up.    
+
+
+Very Important:
+Note: Sometimes no answer's an answer:
+    Adjust whm_ask_user() so that for certain questions no answer means don't
+    touch anything, so questions like SHEET_WORKED_HOURS that'd get an empty answer
+    (a single newline) understands it as "I'll input the hours later."
 
 
 Very Important:
@@ -144,6 +124,36 @@ The idea:
 
 
 /******************************************* Completed **********************************************/
+
+[Solved: See below]
+Very Important: 
+Note: It's ok to do yourself a manual job but..:
+    The hour sheet must be editable by hand, but a user should not
+    have to calculate the amount of money made, whm should.
+    whm_read_sheet() should ensure that when the whole sheet has been
+    parsed and stored into the sheet_T object, all filled hours filed
+    has a their corresponding earning field filled and vice-versa.
+
+[whm_update_sheet() recalculate everthing every run]
+    How to determine an hour sheet has been modified, and which fields
+    of the file has been modified?
+    Make a hidden directory: .last_run.d/ that would keeps a double of the
+    latest version of each sheets the program has seen every time is ran.
+    A sheet is first read in memory, then it's double is read and
+    both are compared against each others, adjusting the differences
+    (if old > new then 
+    If nothing has changed whm_update_sheet() isn't called.
+
+    Compare each current days and their doubles if it's the same no calculs must be done but:
+    if earnings are bigger than hours, adjust hours else if hours are bigger than 0 adjust earnings.
+    Each weeks and month data must be reseted before any calcul is to be done on them.
+
+[Made global arrays of sheet_T and config_T pointers for exactly this.]
+    A list of updated sheets waiting to be written to disk sounds like a good idea.
+
+    What I really want: A user can edit any fields of an hour sheet and whm will adjust the
+    related values accordingly.
+
 
 [Done: Created s_strcmp within Libsafeutils, that has a flag for this.]
 Important:

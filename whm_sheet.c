@@ -10,8 +10,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
+#include <unistd.h>
 
 #include "whm.h"
+
+/* Global list of sheet to be written to disk (whm_main.c). */
+extern whm_backup_T *to_write;
 
 /* 
  * Fill the structures to create a new hour sheet.
@@ -376,7 +381,8 @@ int whm_read_sheet(char *pathname,
   }
 
   if ((stream = fopen(pathname, "r")) == NULL){
-    WHM_ERRMESG("Fopen");
+    if (errno != ENOENT)
+      WHM_ERRMESG("Fopen");
     return -1;
   }
   if (s_strcpy(sheet->path, pathname, WHM_MAX_PATHNAME_S) == NULL){
@@ -893,12 +899,15 @@ void whm_get_sheet_cumuls(whm_sheet_T *sheet,
   }
   for (week_ind = 0; week_ind < 6; week_ind++) {
     for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+
       if (sheet->week[week_ind]->pos_total_hours[pos_ind] != -1
 	  && sheet->week[week_ind]->pos_total_earnings[pos_ind] != -1) {
+
 	sheet->day_pos_hours[7][pos_ind] +=
 	  ((sheet->day_pos_hours[7][pos_ind] == -1)
 	   ? sheet->week[week_ind]->pos_total_hours[pos_ind]+1
 	   : sheet->week[week_ind]->pos_total_hours[pos_ind]);
+
 	sheet->day_pos_earnings[7][pos_ind] +=
 	  ((sheet->day_pos_earnings[7][pos_ind] == -1)
 	   ? sheet->week[week_ind]->pos_total_earnings[pos_ind]+1
@@ -931,18 +940,19 @@ void whm_get_sheet_cumuls(whm_sheet_T *sheet,
  * number of hours worked for the current day, for all
  * active companies in the configuration file.
  * This function is assuming the sheets to update have already been
- * read in memory before being called.
+ * read in memory (by whm_automatic_mode()) before being called.
 
- **** This functions is mostly to be called only from whm_automatic_mode() ****
+ **** This functions is to be called only from whm_automatic_mode() ****
 
  */
 int whm_inter_update_sheet(whm_config_T **configs,
 			   whm_sheet_T **sheets,
 			   whm_time_T *time_o,
-			   int max_ind)
+			   int max_ind) /* max_ind is 1 more than the last element of both arrays. */
 {
 
-  int c_ind = -1;
+  int c_ind = -1, week_ind = 0, day_ind = 0, pos_ind = 0;
+  int date = 0, i = 0;
   char answer[WHM_NAME_STR_S];
 
   if (!configs || !sheets || !time_o || !max_ind){
@@ -950,10 +960,239 @@ int whm_inter_update_sheet(whm_config_T **configs,
     return -1;
   }
 
-  while (++c_ind < max_ind) {
-    ;
-    /* 
-     * For each positions of each active companies in the configuration file,
-     * ask the user how many hours were worked for the current day.
-     */
+  /*  Get the week and day indexes of the current day. */
+  while (day_ind < 7){
+    if (strstr(WHM_EN_DAYS[day_ind], time_o->day) != NULL)
+      break;
+    ++day_ind;
   }
+  if (day_ind >= 7) {
+    errno = WHM_INVALIDELEMCOUNT;
+    return -1;
+  }
+  date = atoi(time_o->date);
+  i = day_ind;
+  while (date-- != 0)
+    if (i-- <= 0) {
+      i = 6;
+      ++week_ind;
+    }
+
+  /* 
+   * For each positions of each active companies in the configuration file,
+   * ask the user how many hours were worked for the current day.
+   */
+  while (++c_ind < max_ind) {
+    if (!configs[c_ind]->status) continue;
+
+    /* Set the sheet into the global list. */
+    if (whm_set_sheet(configs[c_ind], sheets[c_ind]) != 0){
+      WHM_ERRMESG("Whm_set_sheet");
+      return -1;
+    }
+    
+    /* 
+     * Look at the pos_hours for the current day to see if
+     * hours have already been wrote down.
+     */
+    for (pos_ind = 0; pos_ind < configs[c_ind]->numof_positions; pos_ind++)
+      if (sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1) {
+	if (whm_ask_user(SHEET_WORKED_HOURS,
+			 answer, WHM_NAME_STR_S,
+			 configs[c_ind], pos_ind) != 0){
+	  WHM_ERRMESG("Whm_ask_user");
+	  return -1;
+	}
+	/* Input the hours. */
+	sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(answer);
+      }
+    /* Update the sheet. */
+    if (whm_update_sheet(configs[c_ind], sheets[c_ind]) != 0){
+      WHM_ERRMESG("Whm_update_sheet");
+      return -1;
+    }
+  }
+
+  return 0;
+
+} /* whm_inter_update_sheet() */
+
+
+/* Reset all fields of a whm_sheet_T* object to their default values. */
+int whm_rm_sheet(whm_config_T *config,
+		 whm_sheet_T *sheet)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+
+  if (!config || !sheet) {
+    errno = EINVAL;
+    return -1;
+  }
+  /* 
+   * It is possible that the sheet hasn't been written to disk yet,
+   * silently ingnore a failed called to unlink with errno set to ENOENT.
+   */
+  if (unlink(sheet->path) != 0)
+    if (errno != ENOENT) {
+      WHM_ERRMESG("Unlink");
+      return -1;
+    }
+  
+  memset(sheet->path, '\0', WHM_MAX_PATHNAME_S);
+  sheet->year = 0;
+  sheet->month = 0;
+  for (; week_ind < 6; week_ind++){
+    for (day_ind = 0; day_ind < 7; day_ind++){
+      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++){
+	sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = -1.0;
+	sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = -1.0;
+	sheet->week[week_ind]->pos_total_hours[pos_ind] = -1.0;
+	sheet->week[week_ind]->pos_total_earnings[pos_ind] = -1.0;
+	sheet->day_pos_hours[day_ind][pos_ind] = -1.0;
+	sheet->day_pos_earnings[day_ind][pos_ind] = -1.0;
+      }
+      sheet->week[week_ind]->day[day_ind]->date = -1.0;
+      sheet->week[week_ind]->day[day_ind]->total_hours = -1.0;
+      sheet->week[week_ind]->day[day_ind]->total_earnings = -1.0;
+      sheet->day_total_hours[day_ind] = -1.0;
+      sheet->day_total_earnings[day_ind] = -1.0;
+    }
+    sheet->week[week_ind]->total_hours = -1.0;
+    sheet->week[week_ind]->total_earnings = -1.0;
+    sheet->week[week_ind]->week_number = 0;
+  }
+
+  return 0;
+} /* whm_rm_sheet() */
+
+
+/* 
+ * Set a string in the global list 'to_write' of sheet to be written to disk. 
+ * The backup filename must be copied manualy.
+ */
+int whm_set_sheet(whm_config_T *config,
+		  whm_sheet_T *sheet)
+{
+  whm_config_T **realloc_c = NULL;
+  whm_sheet_T **realloc_s = NULL;
+  char **realloc_f = NULL;
+  int new_size = 0;
+  
+  if (!config || !sheet){
+    errno = EINVAL;
+    return -1;
+  }
+
+  if (to_write->c_ind+1 >= to_write->size){
+    if ((new_size = to_write->size * 2) >= INT_MAX){
+      errno = EOVERFLOW;
+      return -1;
+    }    
+    if ((realloc_c = realloc(to_write->configs, new_size * sizeof(whm_config_T*))) == NULL){
+      WHM_ERRMESG("Realloc");
+      return -1;
+    }
+    if ((realloc_s = realloc(to_write->sheets, new_size * sizeof(whm_sheet_T*))) == NULL){
+      WHM_ERRMESG("Realloc");
+      goto errjmp;
+    }
+    if ((realloc_f = realloc(to_write->filename, new_size * sizeof(char*))) == NULL){
+      WHM_ERRMESG("Realloc");
+      goto errjmp;
+    }
+    to_write->configs = realloc_c;
+    to_write->sheets = realloc_s;
+    to_write->filename = realloc_f;
+    to_write->size = new_size;
+  }
+  
+  to_write->configs[to_write->c_ind] = config;
+  to_write->sheets[to_write->c_ind] = sheet;
+  ++(to_write->c_ind);
+
+  return 0;
+
+ errjmp:
+  if (realloc_c) {
+    free(realloc_c);
+    realloc_c = NULL;
+  }
+  if (realloc_s) {
+    free(realloc_s);
+    realloc_s = NULL;
+  }
+  if (realloc_f) {
+    free(realloc_f);
+    realloc_f = NULL;
+  }
+  return -1;
+
+} /* whm_set_sheet() */
+
+
+/* Write to disk every hour sheet contained in the global to_write object. */
+int whm_write_sheet_list(whm_time_T *time_o)
+{
+  int i = 0;
+  FILE *stream = NULL;
+
+  if (!time_o) {
+    errno = EINVAL;
+    return -1;
+  }
+  
+  for (; i < to_write->c_ind; i++){
+    /* Backup the sheet only if it already exist. */
+    if ((stream = fopen(to_write->sheets[i]->path, "r")) != NULL){
+      fclose(stream);
+      stream = NULL;
+      if (whm_new_backup(to_write->sheets[i]->path,
+			 to_write->filename[i]) == NULL){
+	WHM_ERRMESG("Whm_new_backup");
+	goto errjmp;
+      }
+    }
+    if ((stream = fopen(to_write->sheets[i]->path, "w")) == NULL) {
+      WHM_ERRMESG("Fopen");
+      return -1;
+    }
+    if (whm_write_sheet(stream, to_write->configs[i],
+			time_o, to_write->sheets[i]) != 0){
+      WHM_ERRMESG("Whm_write_sheet");
+      goto errjmp;
+    }
+    fclose(stream);
+    stream = NULL;
+    /* The sheet is saved to disk, remove the backup if there's one. */
+    if (to_write->filename[i][0] != '\0')
+      if (whm_rm_backup(to_write->filename[i]) != 0){
+	WHM_ERRMESG("Whm_rm_backup");
+	goto errjmp;
+      }
+  }
+  
+  whm_clean_sheet_list();
+
+  return 0;
+
+ errjmp:
+  if (stream) {
+    fclose(stream);
+    stream = NULL;
+  }
+
+  return -1;
+
+} /* whm_write_sheet_list() */
+
+void whm_clean_sheet_list(void)
+{
+  while (--(to_write->c_ind) >= 0){
+    to_write->sheets[to_write->c_ind] = NULL;
+    to_write->configs[to_write->c_ind] = NULL;
+    /* Do not NULL out filename as each strings must be freed when the time comes. */
+    memset(to_write->filename[to_write->c_ind], '\0', WHM_MAX_PATHNAME_S);
+  }
+  to_write->c_ind = 0;
+
+} /* whm_clean_sheet_list() */

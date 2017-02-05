@@ -123,6 +123,7 @@ static const char WHM_EN_DAYS[][WHM_NAME_STR_S] = {
   "Saturday"
 };
 
+
 /*** Data types ***/
 
 /* Broke down time information strings. */
@@ -147,7 +148,7 @@ typedef struct whm_queue_type {
 
 /* Holds all information regarding a single entry of the configuration file. */
 typedef struct whm_config_type {
-  size_t                   status;               /* 0: inactive, no reading is made. > 0: active.               */
+  size_t                   status;               /* 0: inactive, kept for records only; > 0: active.            */
   char                     *employer;            /* The name of the employer for this entry.                    */
   char                     *working_directory;   /* This company's hour sheet directory.                        */
   int                      numof_positions;      /* Number of different positions occupied in this company.     */
@@ -251,6 +252,22 @@ enum whm_config_field_type {
 
 };
 
+/* 
+ * List of sheets and their corresponding configuration entry
+ * to be written to disk, along with the current size of arrays
+ * and the index of the first free element.
+ */
+typedef struct whm_backup_type {
+  whm_sheet_T               **sheets;                      /* Array of pointers to sheets to be written to disk.      */
+  whm_config_T              **configs;                     /* The configuration entry of the sheet of the same index. */
+  char                      **filename;                    /* Array of backup names.                                  */
+  int                       c_ind;                         /* First free element of the arrays.                       */
+  int                       size;                          /* 1 more than the highest available index.                */
+
+} whm_backup_T;
+
+
+  
 /*** Prototypes ***/
 
 /* whm_mem_utils.c */
@@ -269,6 +286,8 @@ whm_sheet_T*   whm_init_sheet_type (void);                 /* Allocate memory to
 void           whm_free_sheet_type (whm_sheet_T *sheet);   /* Free memory of a previously initialized whm_sheet_T object.  */
 whm_option_T*  whm_init_option_type(void);                 /* Allocate memory to a whm_option_T object.                    */
 void           whm_free_option_type(whm_option_T *option); /* Free memory allocated to a whm_option_T object.              */
+whm_backup_T*  whm_init_backup_type(void);                 /* Allocate memory to a whm_backup_T* object.                   */
+void           whm_free_backup_type(whm_backup_T *bup);    /* Free memory allocated to a whm_backup_T* object.             */
 
 /* whm_gen_utils.c */
 int            whm_new_dir         (const char *dir_name); /* Create a new directory if it doesn't already exists.         */
@@ -279,9 +298,9 @@ int            whm_set_string      (whm_queue_T *queue,    /* Add a string to qu
 				    char *value);
 int            whm_clr_string      (whm_queue_T *queue,    /* Clear a string from queue.                                   */
 				    int index);
-char*          whm_new_backup   (const char *filename,  /* Create a backup of the given file.                           */
+char*          whm_new_backup      (const char *filename,  /* Create a backup of the given file.                           */
 				    char *backupname);
-int            whm_rm_backup   (const char *filename); /* Delete the given backup file.                                */
+int            whm_rm_backup       (const char *filename); /* Delete the given backup file.                                */
 int            whm_ask_user        (enum whm_question_type questions, /* Ask a question to the user via stdin.             */
 				    char *answer,
 				    size_t answer_s,
@@ -301,7 +320,7 @@ int            whm_new_config      (const char *pathname,  /* Create a new confi
 				    whm_config_T **configs);
 int            whm_add_config      (int *config_index,     /* Add a company to the configuration file.                     */
 				    whm_config_T **configs);
-int            whm_rm_config   (char *company,         /* Delete the given company from the configuration file.        */
+int            whm_rm_config       (char *company,         /* Delete the given company from the configuration file.        */
 				    int *max_config_ind,
 				    whm_config_T **configs);
 int            whm_read_config     (FILE *stream,          /* Read the configuration file.                                 */
@@ -333,7 +352,7 @@ int            whm_get_field_name    (char *string,        /* Get the whm_config
 				      whm_config_T **configs);
 
 /* whm_sheet.c   */
-int            whm_new_sheet      (whm_sheet_T *sheet,  /* Fill the structure representing an hour sheet.               */
+int            whm_new_sheet         (whm_sheet_T *sheet,  /* Fill the structure representing an hour sheet.               */
 				      size_t *sheet_ind,
 				      whm_config_T *config,
 				      whm_time_T *time_o);
@@ -380,7 +399,22 @@ void            whm_get_week_totals  (whm_sheet_T *sheet,  /* Calculate weekly a
 				      whm_config_T *config);
 void            whm_get_sheet_cumuls (whm_sheet_T *sheet,  /* Calculate monthly cumulatives.                               */
 				      whm_config_T *config);
+int             whm_inter_update_sheet(whm_config_T **configs, /* Interactively update active hour sheets.                 */
+				       whm_sheet_T **sheets,
+				       whm_time_T *time_o,
+				       int max_ind);
+int             whm_rm_sheet         (whm_config_T *config,/* Reset all fields of the given sheet to their default values. */
+				      whm_sheet_T *sheet);
+int             whm_set_sheet        (whm_config_T *config,/* Add an entry to the global list of sheets to write to disk.  */
+				      whm_sheet_T *sheet);
+int             whm_write_sheet_list (whm_time_T *time_o); /* Write to disk all hour sheets in the global list "to_write". */
+void            whm_clean_sheet_list (void);               /* NULL out every objects and strings of the global list "to_write". */
 
+/*   whm_main.c   */
+int             whm_automatic_mode   (whm_config_T **configs, /* Called when no options are present on the command line.   */
+				      whm_sheet_T **sheets,
+				      whm_time_T *time_o,
+				      int max_ind);
 
 void whm_PRINT_config(whm_config_T *config);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */
 void whm_PRINT_sheet(whm_sheet_T *sheet,                   /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !!          */

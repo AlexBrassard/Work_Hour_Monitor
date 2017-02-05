@@ -429,6 +429,7 @@ int whm_ask_user(enum whm_question_type question,
   case SHEET_WORKED_HOURS:
     printf("\nCombien d'heures avez-vous travaillez pour le poste de %s chez %s?: ",
 	   config->positions[pos_ind], config->employer);
+    break;
 
   default:
     errno = WHM_BADQUESTION;

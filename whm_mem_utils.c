@@ -579,3 +579,92 @@ void whm_free_option_type(whm_option_T *option){
   }
   free(option);
 } /* whm_free_option_type() */
+
+
+/* Allocate memory to a whm_backup_T* object. */
+whm_backup_T* whm_init_backup_type(void)
+{
+  whm_backup_T *bup = NULL;
+  size_t ind = 0;
+
+  if ((bup = malloc(sizeof(whm_backup_T))) == NULL){
+    WHM_ERRMESG("Malloc");
+    return NULL;
+  }
+  if ((bup->sheets = malloc(WHM_MAX_CONFIG_ENTRIES * sizeof(whm_sheet_T*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  if ((bup->configs = malloc(WHM_MAX_CONFIG_ENTRIES * sizeof(whm_config_T*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  if ((bup->filename = malloc(WHM_MAX_CONFIG_ENTRIES * sizeof(char*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  for(; ind < WHM_MAX_CONFIG_ENTRIES; ind++)
+    if ((bup->filename[ind] = calloc(WHM_MAX_PATHNAME_S, sizeof(char))) == NULL){
+      WHM_ERRMESG("Calloc");
+      goto errjmp;
+    }
+  bup->c_ind = 0;
+  bup->size = WHM_MAX_CONFIG_ENTRIES;
+
+  return bup;
+
+ errjmp:
+  if (bup) {
+     if (bup->filename){
+      for (ind = 0; ind < WHM_MAX_CONFIG_ENTRIES; ind++)
+	if (bup->filename[ind]) {
+	  free(bup->filename[ind]);
+	  bup->filename[ind] = NULL;
+	}
+      free(bup->filename);
+      bup->filename = NULL;
+    }
+    if (bup->configs) {
+      free(bup->configs);
+      bup->configs = NULL;
+    }
+    if (bup->sheets) {
+      free(bup->sheets);
+      bup->sheets = NULL;
+    }
+    free(bup);
+  }
+  return NULL;
+    
+
+} /* whm_init_backup_type() */
+
+
+/* Release memory allocated to a whm_backup_T* object. */
+void whm_free_backup_type(whm_backup_T *bup)
+{
+  int i = 0;
+  
+  if (!bup) return;
+
+  if (bup->filename){
+    for (i = 0; i < bup->size; i++)
+      if (bup->filename[i]) {
+	free(bup->filename[i]);
+	bup->filename[i] = NULL;
+      }
+    free(bup->filename);
+    bup->filename = NULL;
+  }
+  if (bup->configs) {
+    free(bup->configs);
+    bup->configs = NULL;
+  }
+  if (bup->sheets) {
+    free(bup->sheets);
+    bup->sheets = NULL;
+  }
+  free(bup);
+  bup = NULL;
+
+} /* whm_free_backup_type() */

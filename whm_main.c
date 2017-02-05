@@ -14,7 +14,76 @@
 #include "whm.h"
 #include "whm_error.h"
 
+/* 
+ * List of sheet_T and config_T objects that have
+ * been updated and are ready to be written to disk,
+ * including their backup absolute pathname.
+ */
+whm_backup_T *to_write;
 
+
+/* 
+ * Called when no command line options are present. 
+ * to_write is a global whm_backup_T* initialized by main().
+ */
+int whm_automatic_mode(whm_config_T **configs,
+		       whm_sheet_T **sheets,
+		       whm_time_T *time_o,
+		       int max_ind)            /* One more than the last elements of sheets && configs. */
+{
+  /* 
+   * For each entries of config, make their sheet path.
+   * Read each sheets. 
+   * If we can't read the sheet, make sure the company's status 
+   * is set to active before creating a sheet.
+   * Backup the sheets.
+   * Add the sheet's backup filename to the global list of backup filenames.
+   * Interactively update the sheets.
+   */
+  size_t c_ind = 0;
+  char path[WHM_MAX_PATHNAME_S];
+  char bup_path[WHM_MAX_PATHNAME_S];
+
+    
+  if (!sheets || !configs || !max_ind || !time_o){
+    errno = EINVAL;
+    return -1;
+  }
+
+  for (; (int)c_ind < max_ind; c_ind++) {
+    if (whm_make_sheet_path(path, time_o, configs[c_ind]) == NULL){
+      WHM_ERRMESG("Whm_make_sheet_path");
+      return -1;
+    }
+
+    /* Read or create the sheet if it doesn't exists and the entry is set to active. */
+    if (whm_read_sheet(path, configs[c_ind], time_o, sheets[c_ind]) != 0){
+      if (errno != ENOENT){
+	WHM_ERRMESG("Whm_read_sheet");
+	return -1;
+      }
+      else if (configs[c_ind]->status){
+	if (whm_new_sheet(sheets[c_ind], &c_ind,
+			  configs[c_ind], time_o) != 0){
+	  WHM_ERRMESG("Whm_new_sheet");
+	  return -1;
+	}
+      }
+      else continue;
+    }
+  }
+  
+  if (whm_inter_update_sheet(configs, sheets, time_o, max_ind) != 0){
+    WHM_ERRMESG("Whm_inter_update_sheet");
+    return -1;
+  }
+
+  return 0;
+  
+} /* whm_automatic_mode */
+
+
+/* Work Hour Monitor. */
 int main(int argc, char **argv)
 {
   FILE *stream = NULL;
@@ -51,6 +120,11 @@ int main(int argc, char **argv)
   }
   if (whm_get_time(time_o) != 0){
     WHM_ERRMESG("Whm_get_time");
+    goto errjmp;
+  }
+  /* Allocate memory for global structures. */
+  if ((to_write = whm_init_backup_type()) == NULL){
+    WHM_ERRMESG("Whm_init_backup_type");
     goto errjmp;
   }
 
@@ -119,53 +193,36 @@ int main(int argc, char **argv)
    * to check if it's up to date and if not, update it.
    */
 
-  /* TEST ONLY: */
-  char new_path[WHM_MAX_PATHNAME_S];
-  FILE *sheet_stream = NULL;
-  if (whm_make_sheet_path(new_path, time_o, configs[0]) == NULL){
-    WHM_ERRMESG("Whm_make_sheet_path");
-    goto errjmp;
-  }
-  if (whm_read_sheet(new_path, configs[0], time_o, sheets[0]) != 0){
-    WHM_ERRMESG("Whm_read_sheet");
-    goto errjmp;
-  }
-  if (whm_update_sheet(configs[0], sheets[0]) != 0){
-    WHM_ERRMESG("Whm_update_sheet");
-    goto errjmp;
-  }
-  if ((sheet_stream = fopen(new_path, "w")) == NULL){
-    WHM_ERRMESG("Fopen");
-    goto errjmp;
-  }
-  if (whm_write_sheet(sheet_stream, configs[0],
-		      time_o, sheets[0]) != 0) {
-    WHM_ERRMESG("Whm_write_sheet");
-    goto errjmp;
-  }
-  fclose(sheet_stream);
-  sheet_stream = NULL;
-  
-  
   
   if (argc > 1){ /* There might be options. */
     /* Use whm_parse_options() to execute options. */
     ;
   }
-  /* If the program hasn't terminated yet, execute the automatic mode as well. */
+  else 
+    if (whm_automatic_mode(configs, sheets, time_o, c_ind) != 0){
+      WHM_ERRMESG("Whm_automatic_mode");
+      goto errjmp;
+    }
   
-
+  /* Write every sheet that has been modified to disk now. */
+  if (whm_write_sheet_list(time_o) != 0){
+    WHM_ERRMESG("Whm_write_sheet_list");
+    goto errjmp;
+  }
 
   /* 
    * Before making any modifications to the configuration file, do a backup. 
    * This backup is removed only after the configuration file is written to disk.
+
+   This might not be needed since whm_automatic_mode() isn't modifying the configuration file
+   in any ways. A user must use the proper options to safely modify the configuration file.
+
    */
   if (whm_new_backup(WHM_CONFIGURATION_FILE,
 			config_bkup_name) == NULL){
     WHM_ERRMESG("Whm_new_backup");
     goto errjmp;
   }
-
   /* Write the configuration file to disk. */
   if (whm_write_config(c_ind,
 		       WHM_CONFIGURATION_FILE,
@@ -173,7 +230,6 @@ int main(int argc, char **argv)
     WHM_ERRMESG("Whm_write_config");
     goto errjmp;
   }
-
   /* Remove the configuration file's backup file. */
   if (whm_rm_backup(config_bkup_name) != 0){
     WHM_ERRMESG("Whm_rm_backup");
@@ -181,6 +237,10 @@ int main(int argc, char **argv)
   }
   
   /* Cleanup before exit. */
+  if (to_write) {
+    whm_free_backup_type(to_write);
+    to_write = NULL;
+  }
   if (configs){
     for (i = 0; i < WHM_MAX_CONFIG_ENTRIES; i++)
       if (configs[i]){
@@ -211,6 +271,10 @@ int main(int argc, char **argv)
     fclose(stream);
     stream = NULL;
   }
+  if (to_write) {
+    whm_free_backup_type(to_write);
+    to_write = NULL;
+  }
   if (configs){
     for (i = 0; i < WHM_MAX_CONFIG_ENTRIES; i++)
       if (configs[i]){
@@ -233,7 +297,6 @@ int main(int argc, char **argv)
     whm_free_time_type(time_o);
     time_o = NULL;
   }
-
   
   return -1;
 }

@@ -17,11 +17,11 @@ P------  Pseudocoded
 
 STATUS	  NAME			     FILE		   DESCRIPTION
 
--------	  whm_automatic_mode	     whm_main.c		   Executed when no command line options are present.
-P------	  whm_parse_options	     whm_main.c		   Parse and execute command line options.
+PC-----	  whm_automatic_mode	     whm_main.c		   Executed when no command line options are present.
+P-----A	  whm_parse_options	     whm_main.c		   Parse and execute command line options.
 P------	  whm_fill_option	     whm_main.c		   Fill a whm_option_type object with appropriate values.
 P------	  whm_get_args		     whm_main.c		   Get arguments for an option from argv.
-P------	  main			     whm_main.c		   Work Hour Monitor.
+P-----A	  main			     whm_main.c		   Work Hour Monitor.
 
 -C-----	  whm_init_day_type	     whm_mem_utils.c
 -C-----	  whm_free_day_type	     whm_mem_utils.c
@@ -37,6 +37,8 @@ P------	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_free_config_type	     whm_mem_utils.c
 -C-----	  whm_init_option_type       whm_mem_utils.c
 -C-----	  whm_free_option_type	     whm_mem_utils.c
+-C-----	  whm_init_backup_type	     whm_mem_utils.c
+-C-----	  whm_free_backup_type	     whm_mem_utils.c
 
 -C-----	  whm_new_dir	 	     whm_gen_utils.c       Create a new directory.
 -C-----	  whm_get_time		     whm_gen_utils.c	   Populate a whm_time_T* object.
@@ -72,9 +74,12 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -C-----	  whm_parse_sheet	     whm_sheet.c	   Parse the calendar content read from an hour sheet.
 -C-----	  whm_queue_to_sheet	     whm_sheet.c	   Empty a working queue (whm_queue_T) into a whm_sheet_T* object.
 -C-----	  whm_write_sheet	     whm_sheet.c	   Write the given hour sheet to the given stream.
+-C-----	  whm_write_sheet_list	     whm_sheet.c	   Write the global sheet list to disk.
+-C-----	  whm_clean_sheet_list	     whm_sheet.c	   Null out every pointers in the global sheet list.
+-C-----	  whm_set_sheet		     whm_sheet.c	   Add a sheet and a config entry to the list to be written to disk.
 -C-----	  whm_make_sheet_path	     whm_sheet.c	   Build a new sheet's absolute pathname.
------T-	  whm_rm_sheet		     whm_sheet.c	   Delete an existing hour sheet (from the array of whm_sheet_T* objects).
------TA	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
+-C---T-	  whm_rm_sheet		     whm_sheet.c	   Delete an existing hour sheet (File + data).
+-C---T-	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
 -C---T-	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet.
 -C-----	  whm_reset_totals           whm_sheet.c           Reset all sheet totals to -1.0.
 PC-----	  whm_get_day_totals	     whm_sheet.c	   Calculate the totals of hours/earnings for each days of the month.
@@ -105,9 +110,14 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 ----O--** whm_cmp_names		     whm_gen_utils.c	   Compare a string against ->name fields of a whm_sheet_T* array.
 ----O--+  whm_parse_sheet_cumul	     whm_sheet.c	   Parse the cumulatives content read from an hour sheet.
 ----OT-++ whm_print_sheet	     whm_sheet.c	   Print an hour sheet to stdout.
+-C--O--!  whm_init_filename_type     whm_mem_utils.c
+-C--O--!  whm_free_filename_type     whm_mem_utils.c
+----O--!! whm_get_sheet		     whm_sheet.c	   Get and remove a sheet and config entry from the list to be written to disk.
 
 
 *  Really no use in making a function for this, much more simple to add the value by hand.
 ** Still might create it later on, but at the moment I don't see a need for it.
 +  Merged with whm_parse_sheet() (aka whm_parse_sheet_cal()).
 ++ Merged with whm_write_sheet().
+!  Merged the whole data type with whm_backup_T.
+!! Will manualy access the object and verify the index as needed.
