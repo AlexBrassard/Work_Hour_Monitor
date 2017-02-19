@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "whm.h"
 
@@ -34,7 +35,7 @@ int whm_new_sheet(whm_sheet_T  *sheet,
 
   if (!sheet || !config || !time_o || !sheet_ind){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   /* 
@@ -43,7 +44,7 @@ int whm_new_sheet(whm_sheet_T  *sheet,
    */
   if (whm_make_sheet_path(sheet->path, time_o, config) == NULL){
     WHM_ERRMESG("Whm_make_sheet_path");
-    return -1;
+    return WHM_ERROR;
   }
 
   /* 
@@ -54,7 +55,7 @@ int whm_new_sheet(whm_sheet_T  *sheet,
     fclose(stream);
     stream = NULL;
     errno = WHM_FILEEXIST;
-    return -1;
+    return WHM_ERROR;
   }
 
   /*
@@ -140,12 +141,12 @@ int whm_print_sheet_head(FILE *stream,
 {
   if (!stream || !config || !time_o){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   fprintf(stream, "/*\n * Work Hour Monitor\n * Heures travaillees chez %s pour le mois de %s %s.\n \
 *\n *\n *\n * Respectez le format et les espacements lors des modifications manuelles de ce fichier.\n *\n */\n\n\n\n",
-	  config->employer, WHM_FR_MONTHS[atoi(time_o->month)],
+	  config->employer, WHM_FR_MONTHS[atoi(time_o->month)-1],
 	  time_o->year);
   return 0;
 }
@@ -172,7 +173,7 @@ int whm_print_sheet_cal(FILE *stream,
   if (!stream || !config
       || !time_o || !sheet){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   /* Each week entries in an hour sheet is separated by an empty line "\n\0" */
@@ -219,9 +220,9 @@ int whm_print_sheet_cal(FILE *stream,
       fprintf(stream, "\n                   ");
       for (day_ind = 0; day_ind < 7; day_ind++){
 	fprintf(stream, "%6.6s$    ",
-		((sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1)
+		((sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] == -1)
 		 ? WHM_NO_CASH
-		 : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind], WHM_NAME_STR_S)));
+		 : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind], WHM_NAME_STR_S)));
       }
       fprintf(stream, "                   %8.8s$",
 	      ((sheet->week[week_ind]->pos_total_earnings[pos_ind] == -1) 
@@ -280,7 +281,7 @@ int whm_print_sheet_cumul(FILE *stream,
 
   if (!stream || !config || !time_o || !sheet){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   fprintf(stream, "\n/************************************************************************************/\nCumulatifs:\n\n\n");
@@ -338,23 +339,23 @@ int whm_write_sheet(FILE         *stream,
 
   if (!stream || !sheet || !config || !time_o) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   /* Print a header message to the sheet. */
   if (whm_print_sheet_head(stream, config, time_o) != 0) {
     WHM_ERRMESG("Whm_print_sheet_head");
-    return -1;
+    return WHM_ERROR;
   }
   /* Print the calendar part of the hour sheet. */
   if (whm_print_sheet_cal(stream, config, time_o, sheet) != 0){
     WHM_ERRMESG("Whm_print_sheet_cal");
-    return -1;
+    return WHM_ERROR;
   }
   /* Call whm_print_sheet_cumul() to print the cumulatives part of the hour sheet. */
   if (whm_print_sheet_cumul(stream, config, time_o, sheet) != 0){
     WHM_ERRMESG("Whm_print_sheet_cumul");
-    return -1;
+    return WHM_ERROR;
   }
 
   return 0;
@@ -377,13 +378,13 @@ int whm_read_sheet(char *pathname,
 
   if (!pathname || !config || !time_o || !sheet){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   if ((stream = fopen(pathname, "r")) == NULL){
     if (errno != ENOENT)
       WHM_ERRMESG("Fopen");
-    return -1;
+    return WHM_ERROR;
   }
   if (s_strcpy(sheet->path, pathname, WHM_MAX_PATHNAME_S) == NULL){
     WHM_ERRMESG("S_strcpy");
@@ -423,7 +424,7 @@ int whm_read_sheet(char *pathname,
     free(content);
     content = NULL;
   }
-  return -1;
+  return WHM_ERROR;
 
 } /* whm_read_sheet() */
 
@@ -443,7 +444,7 @@ int whm_queue_to_sheet(whm_config_T *config,
       || week_ind < 0 || pos_ind < 0
       || day_ind < 0){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   if (is_cal){
@@ -494,7 +495,7 @@ int whm_queue_to_sheet(whm_config_T *config,
     }
     else {
       errno = WHM_INVALIDELEMCOUNT;
-      return -1;
+      return WHM_ERROR;
     }
   }
   else {
@@ -524,7 +525,7 @@ int whm_queue_to_sheet(whm_config_T *config,
     }
     else {
       errno = WHM_INVALIDELEMCOUNT;
-      return -1;
+      return WHM_ERROR;
     }    
   }
 
@@ -538,7 +539,7 @@ int whm_parse_sheet(whm_config_T *config,
 			whm_sheet_T *sheet,
 			char *content)
 {
-  int    line_count = 0;
+  int    line_count = 0, is_cal = 0;
   int    day_ind  = 0, pos_ind = 0, week_ind = 0;
   int    cont_ind = 0, temp_ind = 0;
   whm_queue_T *queue = NULL;
@@ -546,11 +547,11 @@ int whm_parse_sheet(whm_config_T *config,
 
   if (!sheet || !config  || !content){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   if ((queue = whm_init_queue_type(WHM_DEF_QUEUE_SIZE, WHM_NAME_STR_S)) == NULL){
     WHM_ERRMESG("Whm_init_queue_type");
-    return -1;
+    return WHM_ERROR;
   }
 
   /* To remove the 'use of uninitialized value' from valgrind. */
@@ -563,7 +564,7 @@ int whm_parse_sheet(whm_config_T *config,
    * statements cause say an 'outter if' succeeds but one of its
    * 'inner if' fails, I want the conditions bellow to be verified
    * without having to terminate the current loop itteration right away.
-   * Felt I have to justify myself.
+   * Felt I have to justify myself..
    */
   while(content[cont_ind] != '\0'){
 
@@ -575,7 +576,7 @@ int whm_parse_sheet(whm_config_T *config,
       /* Single line comments: from '#' to 'EOL' or from '//' to 'EOL' */
       if (content[cont_ind] == NUMBER ||
 	  (content[cont_ind+1] != '\0' && content[cont_ind+1] == SLASH)){
-	if (whm_skip_comments(content, &cont_ind, 0) != 0){
+	if (whm_skip_sheet_comments(sheet, content, &cont_ind, 0) != 0){
 	  WHM_ERRMESG("Whm_skip_comments");
 	  goto errjmp;
 	}
@@ -583,7 +584,7 @@ int whm_parse_sheet(whm_config_T *config,
       }
       /* Multi-lines, C89-style comments. */
       else if (content[cont_ind+1] != '\0' && content[cont_ind+1] == STAR){
-	if (whm_skip_comments(content, &cont_ind, 1) != 0){
+	if (whm_skip_sheet_comments(sheet, content, &cont_ind, 1) != 0){
 	  WHM_ERRMESG("Whm_skip_comments");
 	  goto errjmp;
 	}
@@ -596,8 +597,7 @@ int whm_parse_sheet(whm_config_T *config,
      * make sure not to leave a string in temp, make sure the queue
      * isn't empty and fill the whm_sheet_T fields revelant to the
      * line_count. If the next character is another newline,
-     * increment week_ind till it reaches 6, then its time to 
-     * call whm_parse_sheet_cumul().
+     * increment week_ind.
      */
     if (content[cont_ind] == NEWLINE) {
       ++cont_ind;
@@ -610,9 +610,7 @@ int whm_parse_sheet(whm_config_T *config,
       }
       if (queue->is_empty) continue;
       if (line_count <= 1 || pos_ind >= (int)config->numof_positions) pos_ind = 0;
-      else if ((line_count > 1)
-	       && (line_count < (config->numof_positions*2)+1)
-	       && (line_count % 2)) pos_ind++;
+      
       /*
        * When parsing the calendar part, day_ind is calculated by
        * whm_queue_to_sheet() itself while when parsing the cumulatives
@@ -620,23 +618,28 @@ int whm_parse_sheet(whm_config_T *config,
        * Even though there are only 7 days in a week, the 8th index is used
        * to store the monthly total values.
        */
-      if (day_ind >= 8) day_ind = 0; 
+      if (week_ind < 6) is_cal = 1;
+      else is_cal = 0;
       if (whm_queue_to_sheet(config, queue, sheet,
 			     line_count, week_ind,
 			     pos_ind,
-			     ((week_ind < 6) ? 0 : day_ind++),
-			     ((week_ind < 6) ? 1 : 0)) != 0){ /* 0 When parsing cumulatives, 1 for calendar. */
+			     day_ind,
+			     is_cal) != 0){ /* 0 When parsing cumulatives, 1 for calendar. */
 	WHM_ERRMESG("Whm_queue_to_sheet");
 	goto errjmp;
       }
+      if ((line_count > 1)
+	  && (line_count < (config->numof_positions*2)+2)
+	  && (line_count % 2))
+	++pos_ind;
       ++line_count;
       if (content[cont_ind] == NEWLINE){
 	++cont_ind;
-	if (++week_ind >= 6) {
-	  /* Call whm_parse_sheet_cumul() here then break. We're done. 
-	     break;*/
-	}
+	/* Once week_ind is bigger than 6, it doesn't matter anymore. */
+	++week_ind;
 	line_count = 0;
+	if (week_ind < 7 || day_ind > 7) day_ind = 0;
+	else ++day_ind;
       }
       continue;
     }
@@ -693,7 +696,7 @@ int whm_parse_sheet(whm_config_T *config,
     whm_free_queue_type(queue);
     queue = NULL;
   }
-  return -1;
+  return WHM_ERROR;
   
 
 } /* whm_parse_sheet() */
@@ -713,7 +716,7 @@ int whm_update_sheet(whm_config_T *config,
 
   if (!config || !sheet){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   /* 
@@ -761,6 +764,12 @@ void whm_reset_totals(whm_sheet_T *sheet,
 	sheet->week[week_ind]->pos_total_earnings[pos_ind] = -1.0;
       }
     }
+  }
+  sheet->day_total_hours[7] = -1.0;
+  sheet->day_total_earnings[7] = -1.0;
+  for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++){
+    sheet->day_pos_hours[7][pos_ind] = -1.0;
+    sheet->day_pos_earnings[7][pos_ind] = -1.0;
   }
 } /* whm_reset_totals() */
 
@@ -868,7 +877,6 @@ void whm_get_sheet_cumuls(whm_sheet_T *sheet,
 {
   int week_ind = 0, day_ind = 0, pos_ind = 0;
 
-  /* Index 7 is the grand totals for this month. */
   for (; day_ind < 7; day_ind++) {
     for (week_ind = 0; week_ind < 6; week_ind++) {
       for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
@@ -897,6 +905,7 @@ void whm_get_sheet_cumuls(whm_sheet_T *sheet,
       }
     }
   }
+  /* Index 7 is the grand totals for this month. */
   for (week_ind = 0; week_ind < 6; week_ind++) {
     for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
 
@@ -957,18 +966,18 @@ int whm_inter_update_sheet(whm_config_T **configs,
 
   if (!configs || !sheets || !time_o || !max_ind){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   /*  Get the week and day indexes of the current day. */
   while (day_ind < 7){
-    if (strstr(WHM_EN_DAYS[day_ind], time_o->day) != NULL)
+    if (s_strstr(WHM_EN_DAYS[day_ind], time_o->day, WHM_TIME_STR_S, 0) >= 0)
       break;
     ++day_ind;
   }
   if (day_ind >= 7) {
     errno = WHM_INVALIDELEMCOUNT;
-    return -1;
+    return WHM_ERROR;
   }
   date = atoi(time_o->date);
   i = day_ind;
@@ -988,7 +997,7 @@ int whm_inter_update_sheet(whm_config_T **configs,
     /* Set the sheet into the global list. */
     if (whm_set_sheet(configs[c_ind], sheets[c_ind]) != 0){
       WHM_ERRMESG("Whm_set_sheet");
-      return -1;
+      return WHM_ERROR;
     }
     
     /* 
@@ -1001,7 +1010,7 @@ int whm_inter_update_sheet(whm_config_T **configs,
 			 answer, WHM_NAME_STR_S,
 			 configs[c_ind], pos_ind) != 0){
 	  WHM_ERRMESG("Whm_ask_user");
-	  return -1;
+	  return WHM_ERROR;
 	}
 	/* Input the hours. */
 	sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(answer);
@@ -1009,7 +1018,7 @@ int whm_inter_update_sheet(whm_config_T **configs,
     /* Update the sheet. */
     if (whm_update_sheet(configs[c_ind], sheets[c_ind]) != 0){
       WHM_ERRMESG("Whm_update_sheet");
-      return -1;
+      return WHM_ERROR;
     }
   }
 
@@ -1026,7 +1035,7 @@ int whm_rm_sheet(whm_config_T *config,
 
   if (!config || !sheet) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   /* 
    * It is possible that the sheet hasn't been written to disk yet,
@@ -1035,7 +1044,7 @@ int whm_rm_sheet(whm_config_T *config,
   if (unlink(sheet->path) != 0)
     if (errno != ENOENT) {
       WHM_ERRMESG("Unlink");
-      return -1;
+      return WHM_ERROR;
     }
   
   memset(sheet->path, '\0', WHM_MAX_PATHNAME_S);
@@ -1067,7 +1076,7 @@ int whm_rm_sheet(whm_config_T *config,
 
 
 /* 
- * Set a string in the global list 'to_write' of sheet to be written to disk. 
+ * Set a sheet in the global list 'to_write' of sheet to be written to disk. 
  * The backup filename must be copied manualy.
  */
 int whm_set_sheet(whm_config_T *config,
@@ -1080,17 +1089,17 @@ int whm_set_sheet(whm_config_T *config,
   
   if (!config || !sheet){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   if (to_write->c_ind+1 >= to_write->size){
     if ((new_size = to_write->size * 2) >= INT_MAX){
       errno = EOVERFLOW;
-      return -1;
+      return WHM_ERROR;
     }    
     if ((realloc_c = realloc(to_write->configs, new_size * sizeof(whm_config_T*))) == NULL){
       WHM_ERRMESG("Realloc");
-      return -1;
+      return WHM_ERROR;
     }
     if ((realloc_s = realloc(to_write->sheets, new_size * sizeof(whm_sheet_T*))) == NULL){
       WHM_ERRMESG("Realloc");
@@ -1125,7 +1134,7 @@ int whm_set_sheet(whm_config_T *config,
     free(realloc_f);
     realloc_f = NULL;
   }
-  return -1;
+  return WHM_ERROR;
 
 } /* whm_set_sheet() */
 
@@ -1138,7 +1147,7 @@ int whm_write_sheet_list(whm_time_T *time_o)
 
   if (!time_o) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   
   for (; i < to_write->c_ind; i++){
@@ -1154,7 +1163,7 @@ int whm_write_sheet_list(whm_time_T *time_o)
     }
     if ((stream = fopen(to_write->sheets[i]->path, "w")) == NULL) {
       WHM_ERRMESG("Fopen");
-      return -1;
+      return WHM_ERROR;
     }
     if (whm_write_sheet(stream, to_write->configs[i],
 			time_o, to_write->sheets[i]) != 0){
@@ -1163,6 +1172,10 @@ int whm_write_sheet_list(whm_time_T *time_o)
     }
     fclose(stream);
     stream = NULL;
+    if (chmod(to_write->sheets[i]->path, 0600) != 0){
+      WHM_ERRMESG("Chmod");
+      goto errjmp;
+    }
     /* The sheet is saved to disk, remove the backup if there's one. */
     if (to_write->filename[i][0] != '\0')
       if (whm_rm_backup(to_write->filename[i]) != 0){
@@ -1181,7 +1194,7 @@ int whm_write_sheet_list(whm_time_T *time_o)
     stream = NULL;
   }
 
-  return -1;
+  return WHM_ERROR;
 
 } /* whm_write_sheet_list() */
 

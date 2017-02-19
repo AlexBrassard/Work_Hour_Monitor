@@ -25,18 +25,18 @@ int whm_new_dir(const char *dir_name)
   
   if (!dir_name) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   /* Return an error if the directory already exists. */
   if ((test_stream = fopen(dir_name, "r")) != NULL){
     errno = WHM_DIREXIST;
     fclose(test_stream);
     test_stream = NULL;
-    return -1;
+    return WHM_ERROR;
   }
   if (mkdir(dir_name, WHM_DIRECTORY_PERMISSION) != 0){
     WHM_ERRMESG("Mkdir");
-    return -1;
+    return WHM_ERROR;
   }
   return 0;
   
@@ -53,16 +53,16 @@ int whm_get_time(whm_time_T *time_o)
   
   if (!time_o){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   if ((t = time(NULL)) == -1){
     WHM_ERRMESG("Time");
-    return -1;
+    return WHM_ERROR;
   }
   if ((temp = localtime(&t)) == NULL){
     WHM_ERRMESG("Localtime");
-    return -1;
+    return WHM_ERROR;
   }
   /*
    * %a: The abreviated day name.           [0]
@@ -76,7 +76,7 @@ int whm_get_time(whm_time_T *time_o)
   if (strftime(time_string, WHM_STRFTIME_STR_S, "%a %d %V %m %Y", temp) == 0
       && errno){
     WHM_ERRMESG("Strftime");
-    return -1;
+    return WHM_ERROR;
   }
   
   /*
@@ -91,36 +91,36 @@ int whm_get_time(whm_time_T *time_o)
       case 0:
 	if (s_strcpy(time_o->day, temp_string, WHM_TIME_STR_S) == NULL){
 	  WHM_ERRMESG("S_strcpy");
-	  return -1;
+	  return WHM_ERROR;
 	}
 	break;
       case 1:
 	if (s_strcpy(time_o->date, temp_string, WHM_TIME_STR_S) == NULL){
 	  WHM_ERRMESG("S_strcpy");
-	  return -1;
+	  return WHM_ERROR;
 	}
 	break;
       case 2:
 	if (s_strcpy(time_o->week, temp_string, WHM_TIME_STR_S) == NULL){
 	  WHM_ERRMESG("S_strcpy");
-	  return -1;
+	  return WHM_ERROR;
 	}
 	break;
       case 3:
 	if (s_strcpy(time_o->month, temp_string, WHM_TIME_STR_S) == NULL){
 	  WHM_ERRMESG("S_strcpy");
-	  return -1;
+	  return WHM_ERROR;
 	}
 	break;
       case 4:
 	if (s_strcpy(time_o->year, temp_string, WHM_TIME_STR_S) == NULL){
 	  WHM_ERRMESG("S_strcpy");
-	  return -1;
+	  return WHM_ERROR;
 	}
 	break;
       default:
 	errno = WHM_BADWORDCOUNT;
-	return -1;
+	return WHM_ERROR;
       }
       ++word_count;
       ++i;
@@ -142,7 +142,7 @@ int whm_clr_time(whm_time_T *time_o)
 {
   if (!time_o) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   memset(time_o, '\0', WHM_TIME_STR_S*5); /* 5: a whm_time_T has 5 fields of identical sizes. */
   return 0;
@@ -184,17 +184,17 @@ int whm_set_string(whm_queue_T *queue, char *value)
 {
   if (!queue || !value || value[0] == '\0') {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   if (queue->index > queue->top_index) {
     errno = WHM_FULLQUEUE;
-    return -1;
+    return WHM_ERROR;
   }
 
   if (s_strcpy(queue->string[queue->index], value, queue->string_lenght) == NULL){
     WHM_ERRMESG("S_strcpy");
-    return -1;
+    return WHM_ERROR;
   }
   queue->is_empty = 0;
   queue->index++;
@@ -210,7 +210,7 @@ int whm_clr_string(whm_queue_T *queue, int index)
 {
   if (!queue || index > queue->top_index) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   memset(queue->string[index], '\0', queue->string_lenght);
@@ -297,12 +297,12 @@ int whm_rm_backup(const char *filename)
 {
   if (!filename){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
 
   if (remove(filename) == -1){
     WHM_ERRMESG("Remove");
-    return -1;
+    return WHM_ERROR;
   }
   return 0;
 } /* whm_rm_backup() */
@@ -441,11 +441,16 @@ int whm_ask_user(enum whm_question_type question,
   while (i < WHM_NUMOF_EOI_STRINGS)
     if (strcmp(answer, WHM_END_OF_INPUT[i++]) == 0)
       return WHM_INPUTDONE;
+  if (s_strcmp(answer, "cancel", answer_s, LS_ICASE) == 0
+      || s_strcmp(answer, "exit", answer_s, LS_ICASE) == 0){
+    printf("\nCanceled\n\n");
+    exit(EXIT_SUCCESS);
+  }    
   answer[answer_s-1] = '\0';
   return 0;
 
  errjmp:
-  return -1;
+  return WHM_ERROR;
 
 #ifdef WHM_ASK
 # undef WHM_ASK
@@ -466,7 +471,7 @@ int whm_new_year_dir(whm_config_T *config,
   
   if (!config || !time_o) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   } 
 
   /* 
@@ -477,11 +482,11 @@ int whm_new_year_dir(whm_config_T *config,
   if ((strlen(WHM_WORKING_DIRECTORY) + strlen(config->employer)
        + strlen(time_o->year) + 5) > WHM_MAX_PATHNAME_S) {
     errno = EOVERFLOW;
-    return -1;
+    return WHM_ERROR;
   }
   if (s_strcpy(path, (char*)WHM_WORKING_DIRECTORY, WHM_MAX_PATHNAME_S) == NULL){
     WHM_ERRMESG("S_strcpy");
-    return -1;
+    return WHM_ERROR;
   }
   strcat(path, "/");
   strcat(path, config->employer);
@@ -497,7 +502,7 @@ int whm_new_year_dir(whm_config_T *config,
   if (whm_new_dir((const char*)path) != 0
       && errno != WHM_DIREXIST){
     WHM_ERRMESG("Whm_new_dir");
-    return -1;
+    return WHM_ERROR;
   }
 
   return 0;
@@ -514,7 +519,7 @@ int whm_find_first_dom(whm_time_T *time_o,
   size_t date = 0, day_ind = 0;
   if (!time_o || !week_num){
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   
   /* Keep in mind that Sunday is day 0, Saturday is day 6. */
@@ -529,7 +534,7 @@ int whm_find_first_dom(whm_time_T *time_o,
   /* There was a problem. */
   if (day_ind > 6) {
     errno = WHM_INVALIDELEMCOUNT;
-    return -1;
+    return WHM_ERROR;
   }
   
   /* Find the first day of month. */
@@ -538,7 +543,7 @@ int whm_find_first_dom(whm_time_T *time_o,
       day_ind = 6;
       if ((*week_num)-- == 0){
 	errno = WHM_INVALIDELEMCOUNT;
-	return -1;
+	return WHM_ERROR;
       }			       
     }
 
@@ -569,7 +574,7 @@ int whm_skip_comments(char *string,
 
   if (!string || !ind) {
     errno = EINVAL;
-    return -1;
+    return WHM_ERROR;
   }
   
   if (multi_lines > 0)
@@ -598,7 +603,211 @@ int whm_skip_comments(char *string,
 
  invalid_comment:
   errno = WHM_INVALIDCOMMENT;
-  return -1;
+  return WHM_ERROR;
 
 
 } /* whm_skip_comments() */
+
+
+/* Records the positions and skip an hour sheet's commentaries. */
+int whm_skip_sheet_comments(whm_sheet_T *sheet,
+			   char *string,
+			   int *ind,
+			   int multi_lines)
+{
+  char *own_string = NULL;
+  int offset_changed = 0;
+  size_t string_s = strlen(string)+1;
+
+  if ((own_string = calloc(string_s, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    return WHM_ERROR;
+  }
+  if (s_strcpy(own_string, string, string_s) == NULL){
+    WHM_ERRMESG("S_strpy");
+    goto errjmp;
+  }
+  /* Make sure there's enough room in the comment array else make some. */
+  if (sheet->comment_ind >= (int)sheet->numof_comments)
+    if (whm_extend_comment_arr(sheet->comments,&(sheet->numof_comments)) == NULL){
+      WHM_ERRMESG("Whm_extend_comment_arr");
+      goto errjmp;
+    }
+  /* *ind is the first character of the commentary sequence. */
+  sheet->comments[sheet->comment_ind]->b_offset = *ind;  
+  /* Skip the sequence to find the end of commentary offset. */
+  if (whm_skip_comments(string, ind, multi_lines) != 0){
+    WHM_ERRMESG("Whm_skip_comments");
+    goto errjmp;
+  }
+  sheet->comments[sheet->comment_ind]->e_offset = *ind;
+  /* Add the begining offset to our copy of string and a NULL byte at the ending offset. */
+  own_string[sheet->comments[sheet->comment_ind]->e_offset] = '\0';
+  own_string += sheet->comments[sheet->comment_ind]->b_offset;
+  ++offset_changed;
+  /* Make sure the resulting string fits in the sheet's commentary buffer else extend it. */
+  if (strlen(own_string) < WHM_MAX_COMMENT_SIZE){
+    while (strlen(own_string) >= sheet->comments[sheet->comment_ind]->text_s)
+      if (whm_extend_comment_text(sheet->comments[sheet->comment_ind]) != 0){
+	WHM_ERRMESG("Whm_extend_comment_text");
+	goto errjmp;
+      }
+  }
+  else {
+    errno = WHM_COMMENTTOOLONG;
+    goto errjmp;
+  }
+  /* Copy the resulting string into the sheet's commentary buffer and increment the sheet's comment index. */
+  if (s_strcpy(sheet->comments[sheet->comment_ind]->text,
+	       own_string,
+	       sheet->comments[sheet->comment_ind]->text_s) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+
+  if (own_string){
+    if (offset_changed)
+      own_string -= sheet->comments[sheet->comment_ind]->b_offset;
+    free(own_string);
+    own_string = NULL;
+  }
+  (sheet->comment_ind)++;
+  return 0;
+
+ errjmp:
+  if (own_string){
+    if (offset_changed)
+      own_string -= sheet->comments[sheet->comment_ind]->b_offset;
+    free(own_string);
+    own_string = NULL;
+  }
+  return WHM_ERROR;
+
+} /* whm_skip_sheet_comment() */
+			   
+
+/* 
+ * Validate a given company name against entries in the configuration file. 
+ * Returns -2 -1 or the index of the corresponding config object on error, 
+ * failure to match and successful match respectively.
+ */
+int whm_validate_name(char *name,
+		      whm_config_T **configs,
+		      int c_ind)
+{
+  if (!name || name[0] == '\0'
+      || !configs || !c_ind) {
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
+
+  while(--c_ind >= 0)
+    if (!configs[c_ind]) {
+      errno = EINVAL;
+      return WHM_ERROR;
+    }
+    else if (s_strcmp(configs[c_ind]->employer, name,
+		      WHM_NAME_STR_S, LS_USPACE) == 0) return c_ind;
+  
+  return WHM_NOMATCH;
+  
+} /* whm_validate_name() */
+
+
+/* 
+ * Verify that the given position name is an actual position of
+ * the given config->employer.
+ * Returns WHM_ERROR, WHM_NOMATCH or the position's index on
+ * error, failure to match and successful match respectively.
+ */
+int whm_validate_position(char *name,
+			  whm_config_T *config)
+{
+  int pos_ind;
+  
+  if (!name || name[0] == '\0' || !config) {
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
+
+  for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++)
+    if(s_strcmp(config->positions[pos_ind], name, WHM_NAME_STR_S, LS_USPACE) == 0)
+      return pos_ind;
+  return WHM_NOMATCH;
+
+} /* whm_validate_position() */
+      
+
+/* Validate the given field of the given time object. */
+int whm_validate_time_field(whm_time_T *time_o,
+			    enum whm_time_field_type field)
+{
+  int day_ind = 0;
+  int do_match = 0, num = 0;
+
+
+  
+  if (!time_o) {
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
+
+  switch (field){
+  case T_DAY:
+    while(day_ind < 7){
+      if (s_strstr(WHM_EN_DAYS[day_ind], time_o->day, WHM_TIME_STR_S, LS_ICASE) >= 0){
+	++do_match;
+	break;
+      }
+      ++day_ind;
+    }
+    break;
+
+  case T_DATE:
+    if ((num = atoi(time_o->date) > 0) && num < 32)
+      ++do_match;
+    break;
+    
+  case T_WEEK:
+    if ((num = atoi(time_o->week) > 0) && num < 54)
+      ++do_match;
+    break;
+
+  case T_MONTH:
+    if ((num = atoi(time_o->month) > 0) && num <= 12)
+      ++do_match;
+    break;
+
+  case T_YEAR:
+    if (atoi(time_o->year) > 0)
+      ++do_match;
+    break;
+
+  default:
+    errno = WHM_INVALIDFIELD;
+    return WHM_ERROR;
+  }
+
+  if (do_match) return 1;
+  return 0;
+
+} /* whm_validate_time_field() */
+
+
+/* Returns -1 on error, else returns the month number corresponding to the given name. */
+int whm_get_month_number(char *month)
+{
+  int num = -1;
+  if (!month){
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
+
+  while(++num < 12)
+    if ((s_strstr(WHM_FR_MONTHS[num], month, WHM_NAME_STR_S, LS_ICASE) >= 0)
+	|| (s_strstr(WHM_EN_MONTHS[num], month, WHM_NAME_STR_S, LS_ICASE) >= 0))
+      return (num+1);
+  errno = WHM_INVALIDMONTH;
+  return WHM_ERROR;
+
+} /* whm_get_month_number() */

@@ -18,10 +18,17 @@ P------  Pseudocoded
 STATUS	  NAME			     FILE		   DESCRIPTION
 
 PC-----	  whm_automatic_mode	     whm_main.c		   Executed when no command line options are present.
-P-----A	  whm_parse_options	     whm_main.c		   Parse and execute command line options.
-P------	  whm_fill_option	     whm_main.c		   Fill a whm_option_type object with appropriate values.
-P------	  whm_get_args		     whm_main.c		   Get arguments for an option from argv.
-P-----A	  main			     whm_main.c		   Work Hour Monitor.
+PC-----	  whm_parse_options	     whm_main.c		   Parse and execute command line options.
+PC-----	  whm_get_args		     whm_main.c		   Get arguments for an option from argv.
+-C-----	  whm_sort_op		     whm_main.c		   Sort operations by types.
+-C-----** whm_help_op		     whm_main.c		   --help.
+-C-----	  whm_print_op		     whm_main.c		   --print (hour sheet/config) option.
+-C-----	  whm_update_op		     whm_main.c		   --update (hour sheet) option.
+-C-----	  whm_add_op		     whm_main.c		   --add (to config) option.
+-C-----	  whm_del_op		     whm_main.c		   --delete (from config) option.
+-C-----	  whm_modify_op		     whm_main.c		   --modify (config entry).
+-C-----	  whm_list_op		     whm_main.c		   --list (config company names) option.
+PC-----	  main			     whm_main.c		   Work Hour Monitor.
 
 -C-----	  whm_init_day_type	     whm_mem_utils.c
 -C-----	  whm_free_day_type	     whm_mem_utils.c
@@ -39,6 +46,12 @@ P-----A	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_free_option_type	     whm_mem_utils.c
 -C-----	  whm_init_backup_type	     whm_mem_utils.c
 -C-----	  whm_free_backup_type	     whm_mem_utils.c
+-C-----	  whm_init_comment_type	     whm_mem_utils.c
+-C-----	  whm_free_comment_type	     whm_mem_utils.c
+-C-----	  whm_extend_comment_text    whm_mem_utils.c
+-C-----	  whm_init_comment_arr	     whm_mem_utils.c
+-C-----	  whm_free_comment_arr	     whm_mem_utils.c
+-C-----	  whm_extend_comment_arr     whm_mem_utils.c
 
 -C-----	  whm_new_dir	 	     whm_gen_utils.c       Create a new directory.
 -C-----	  whm_get_time		     whm_gen_utils.c	   Populate a whm_time_T* object.
@@ -46,12 +59,16 @@ P-----A	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_find_first_dom	     whm_gen_utils.c	   Find what's the first weekday of the current month, and fetches week number.
 -C-----	  whm_get_string	     whm_gen_utils.c	   Get a string from the given queue.
 -C-----	  whm_set_string	     whm_gen_utils.c	   Save a string in the given queue.
--C--O--   whm_clr_string	     whm_gen_utils.c	   Clean all values in the given queue.
 -C-----	  whm_new_bkup  	     whm_gen_utils.c	   Create a backup of the given file.
 -C-----	  whm_rm_bkup	             whm_gen_utils.c	   Remove a given backup file.
 -C-----	  whm_ask_user		     whm_gen_utils.c	   Ask the user via stdin the requested information.
 -C-----	  whm_new_year_dir	     whm_gen_utils.c	   Check existance or create a yearly sheet directory for a given company.
 -C-----	  whm_skip_comments	     whm_gen_utils.c	   Skip a commentary character sequence.
+-C-----	  whm_skip_sheet_comments    whm_gen_utils.c	   Skip and record position of the given hour sheet comment sequence.
+-C-----	  whm_validate_name	     whm_gen_utils.c	   Validate a company name.
+-C-----	  whm_validate_position	     whm_gen_utils.c	   Validate a company's position name.
+-C-----	  whm_validate_time_field    whm_gen_utils.c	   Validate a given field of a whm_time_T* object.
+-C-----	  whm_get_month_number       whm_gen_utils.c	   Get the month number corresponding to the given name.
 
 -C---T-	  whm_add_config	     whm_config.c	   Add a company to an existing configuration file.
 -C---T-	  whm_rm_config	             whm_config.c	   Delete a company from an existing configuration file.
@@ -63,8 +80,10 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -C-----	  whm_write_config	     whm_config.c	   Write an updated configuration file.
 -C---T-	  whm_list_config_names	     whm_config.c	   Print a list of company name in the configuration file to stdout.
 -C---T-	  whm_list_config_fields     whm_config.c	   Print a list of a company's modifiable configuration file fields.
+-C-----	  whm_list_config_pos	     whm_config.c	   Print a list of positions names for a given company's config entry. 
 -C-----   whm_get_company_name	     whm_config.c	   Interactively get a company name to be edited by whm_modify_config().
 -C-----   whm_get_field_name	     whm_config.c	   Interactively get a field name to be edited by whm_modify_config().
+-C-----	  whm_get_field_value	     whm_config.c	   Get the corresponding value of the given field.
 
 -C---T-*  whm_new_sheet		     whm_sheet.c	   Fill a sheet structure representing a new hour sheet.
 -C-----	  whm_print_sheet_head       whm_sheet.c	   Print a header message into a new hour sheet.
@@ -94,6 +113,7 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 -C-----	  whm_PRINT_config	     whm_main.c		   GDB HOOK - Print all informations of a whm_config_T* object.
 -C-----	  whm_PRINT_sheet	     whm_main.c		   GDB HOOK - Print all informations of a whm_sheet_T* object.
 -C-----	  whm_PRINT_queue	     whm_main.c		   GDB HOOK - Print all informations of a whm_queue_T* object.
+-C-----	  whm_PRINT_option	     whm_main.c		   GDB HOOK - Print all informations of a whm_option_T* object.
 
 
 
@@ -101,6 +121,7 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
    Whm should be the only one responsible of determining when to create
    a new sheet. Whm_rm_sheet tho, should be an option.
 
+** As is now it's working but it could certainly be better, think about it.
 
 
 /****************************************************************************************/
@@ -113,7 +134,8 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 -C--O--!  whm_init_filename_type     whm_mem_utils.c
 -C--O--!  whm_free_filename_type     whm_mem_utils.c
 ----O--!! whm_get_sheet		     whm_sheet.c	   Get and remove a sheet and config entry from the list to be written to disk.
-
+----O--#  whm_fill_option	     whm_main.c		   Fill a whm_option_type object with appropriate values.
+-C--O--## whm_clr_string	     whm_gen_utils.c	   Clean all values in the given queue.
 
 *  Really no use in making a function for this, much more simple to add the value by hand.
 ** Still might create it later on, but at the moment I don't see a need for it.
@@ -121,3 +143,5 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 ++ Merged with whm_write_sheet().
 !  Merged the whole data type with whm_backup_T.
 !! Will manualy access the object and verify the index as needed.
+#  Added an extra step for no real reasons.
+## The buffer gets cleared before each writes into it.

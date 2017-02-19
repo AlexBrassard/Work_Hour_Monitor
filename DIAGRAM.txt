@@ -3,23 +3,13 @@
 				      /         \
 				   /               \
 				/	              \
-                        whm_new_config()       whm_read_config()
+                       whm_new_config()   OR    whm_read_config()
 			        \	              /
                                    \               /
                                       \         /
 					   |
-					   |
-				      /         \
-				   /               \
-				/     	              \
-			whm_new_sheet()        whm_read_sheet()
-			        \                     /
-                                   \               /
-                                      \         /
-				      
 				           |
-					   |
-			          whm_parse_options()
+			          whm_parse_options()             [1]
 		        [One or more of the following options]
 			     	     	   |
 					  /|\
@@ -28,23 +18,37 @@
   whm_[inter]_update_sheet()	     
 				          \|/
 					   |
-				  whm_automatic_mode()
+				  whm_automatic_mode()            [2]
 			     [Update non-updated sheets]
 				           |
 					   |
 			    whm_backup_file(configuration file)
 					   |
 					   |
-			           whm_write_config() ----------------
-					   |                         |
-					   |			     |
-		            whm_backup_file(all read sheets)         | >>> The only point in execution where updated
-  				           |	     		     |     files are written to disk.
-					   |                         |
-			    whm_write_sheet(all read sheets) ---------
+			           whm_write_config()
+					   |
+					   |
+			    whm_write_sheet_list(all read sheets) [3]
 			                   |
 					   |
-			  whm_delete_backup(all read sheets);
-			  		   |
-					   |
 			  whm_delete_backup(configuration file)     		
+
+
+
+
+[1] whm_parse_option
+we're expecting the form "-o || --longopt arg_name=value"
+(short or long option name followed by the argument's name and value in one string.)
+For each option name, make sure it's valid and use
+whm_get_args() to fetch its arguments.
+The operations are sorted in importance order, which is why the order of the
+enum whm_option_names data types' members is important. Element 0 of the
+said data type is the most important while the last is the least important.
+Depending on the option's operation field, execute the appropriate operation
+(whm_*_op functions from whm_main.c).
+
+whm_get_args splits each argument's name from its value and convert the value
+to the appropriate data type to then be saved in the whm_option_T object of the
+current option.
+Arguments' names are in WHM_ARG_NAMES[] (whm.h) and a corresponding enum whm_optarg_type data type
+is made available to ease access to the arrays' members.

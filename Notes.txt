@@ -5,11 +5,13 @@
  */
 TOP
 ----
-Very Important:
-Note: Fail like you were born to fail:
-    Any modifications should be written to disk only at the
-    very last moment so that when failing due to an error or a strong
-    will to cancel everything, not everything gets messed up.    
+Very Important.
+Note: Ignore any comments your hear, but remember all of them just in case:
+    Since the configuration file should not be edited by hand,
+    the position of commentaries and the comments themselfs should not
+    be recorded but it will be very required for operations on hour sheets.
+    Also, make sure that a line containing only a comment does not count
+    in the line_count.
 
 
 Very Important:
@@ -19,20 +21,28 @@ Note: Sometimes no answer's an answer:
     (a single newline) understands it as "I'll input the hours later."
 
 
-Very Important:
-Note: I'm leaving! But please don't be mad..:
-    Every time WHM asks its users something, there must be safe escape routes,
-    safe meaning without consequences on the program's existing data.
-    There should be a way to quit the program totaly, without data lost other than
-    what hasn't been already saved to disk, even in the middle of say modifing the configuration file.
-    At each steps there should be an option to roll back one or more steps
-    in order to modify/overwrite something we've just input.
-
-
 Important:
 Note: Not that twins aren't cool, they're just too confusing:
     When using any of the _modify_config() functions, an additional check
     must be made to make sure no company or position name gets duplicated.
+
+
+Note: Option argument that needs to be added now:
+    The -d --delete option needs a "type" argument, which isn't part
+    of the argument list so I need to add that.
+    The argument would be either "config" or "sheet" which would let users
+    delete either a config entry or an hour sheet.
+    If the type is sheet, delete can take up to 3 more arguments:
+    "name" and "month" and "year", of which only name is obligatory.
+
+    The new field has been added to the structure but I'm still
+    hesitating whether it's a good idea or not to implement this.
+
+
+Note: Routine review:
+    Some routines like whm_modify_config() could use some of the newer
+    routines like whm_validate_position().
+    Review and optimize all routines.
 
 
 Note: Wait till I'm done you little...:
@@ -43,33 +53,7 @@ Note: Wait till I'm done you little...:
      . holiday cash ($ to be paid when going on vacation)
     
 
-
-Note: Options and their arguments:
-    A short option begins by a single dash followed by a single alphabetic character.
-    A long option begins by two dashes followed by one or more alphanumeric characters.
-    Both can take arguments of the form:     arg_name=value    with no spaces in between.
-    An options that can take one or more arguments but which is given none when called
-    on the command line will fall through to it's whm_interac_* function.
-
-    whm_interac_modify_config() and whm_parse_options() are both responsible
-    of validating the company name and finding its index in the whm_config_T* array
-    to correctly feed whm_modify_config().
-
-
-Note: Ignore any comments your hear, but remember all of them just in case:
-    Since the configuration file should not be edited by hand,
-    the position of commentaries and the comments themselfs should not
-    be recorded but it will be very required for operations on hour sheets.
-
-
-Note: Install me properly:
-    The installation script needs to be reworked. First, a makefile must be created
-    to handle everything related to program's compilation.
-    The install script should interactively create (with the option to do it automaticaly)
-    the 'whm_sysdep.h' file, which is mostly system/user dependent pathnames.
-
-
-Mixed Notes:
+Mixed Notes: (Not very acurate anymore)
   - Use fgets to read one line at a time.
   - The configuration file should not be edited by hand.
   - No streams should be passed through functions.
@@ -96,14 +80,37 @@ Mixed Notes:
     . Write all updated hour sheets.
     . Delete all hour sheet backups.
     . Free all memory and exit.
-  - Options are: ((): non required options.)
-    . -p  --print  [name()] [year()] [month()]			Print an hour sheet to stdout.
-    . -u  --update [name()] [position()] [hours()] [date()]	Update a company's hour sheet.
+
+
+Note: Options and their arguments:
+    A short option begins by a single dash followed by a single alphabetic character.
+    A long option begins by two dashes followed by one or more alphanumeric characters.
+    Both can take arguments of the form:     arg_name=value    with no spaces in between.
+    Options are: (whm_*_op() functions, lower whm_main.c file.)
+    . -p  --print  [name] [year] [month]			Print an hour sheet to stdout.
+        The [name] argument is mandatory, [year] and [month] are both optional.
+	If [name] is set to (at least in part) "configuration",
+	the content of the configuration file is printed to stdout.
+	
+    . -u  --update [name] [position] [hours] [date*] [month] [year]  	Update a company's hour sheet.
+        The [name] argument is mandatory.
+	* date in either of the following forms:
+	    dd/mm/yyyy [all digits]	 (the year is optional in both digit forms, 
+	    dd-mm-yyyy [all digits]	  current year is assumed in this case.)
+	    date (digits)                (given date of current month of current year is assumed unless
+	    	 			  month and/or year are also present.)
+	    
+
     . -a  --add    (fully interactive) 		 		Add a company to the configuration file.
-    . -d  --delete [name()]					Delete a company from the configuration file.
-    . -m  --modify [name()] [position()] [field()] [value()]	Modify an existing entry in the configuration file.
+    . -d  --delete [name]					Delete a company from the configuration file.
+        [name] is mandatory.
+	
+    . -m  --modify [name] [position] [field] [value]    	Modify an existing entry in the configuration file.
+        [name] is mandatory, so is [value] but only if [field] is present.
+	
     . -l  --list   						Print a list of the companies names in the configuration file.
     . -h  --help  						Print a short help message.
+
 
 The idea:
     Work Hour Monitor will prompt its users at least once a day
@@ -124,8 +131,45 @@ The idea:
 
 
 /******************************************* Completed **********************************************/
+[Done: inputing "cancel" or "exit" quit discarding any modifications made so far.]
+Very Important:
+Note: I'm leaving! But please don't be mad..:
+    Every time WHM asks its users something, there must be safe escape routes,
+    safe meaning without consequences on the program's existing data.
+    There should be a way to quit the program totaly, without data lost other than
+    what hasn't been already saved to disk, even in the middle of say modifing the configuration file.
+    At each steps there should be an option to roll back one or more steps
+    in order to modify/overwrite something we've just input.
 
-[Solved: See below]
+
+[Done: sheets are written only before exiting, same for configuration file.]
+Very Important:
+Note: Fail like you were born to fail:
+    Any modifications should be written to disk only at the
+    very last moment so that when failing due to an error or a strong
+    will to cancel everything, not everything gets messed up.    
+
+
+[Done]
+Very Important:
+Note: And the magical number is...
+    Replace every '-1' for "WHM_ERROR" (#define in whm_error.h).
+  Related note:
+    Define "WHM_NOMATCH" in whm.h to '-2' so whm_validate_name() can return
+    WHM_ERROR (-1) on error, WHM_NOMATCH when no match is found else the index of
+    the match within the config array.
+
+
+
+[Done: Did exactly this.]
+Note: Install me properly:
+    The installation script needs to be reworked. First, a makefile must be created
+    to handle everything related to program's compilation.
+    The install script should interactively create (with the option to do it automaticaly)
+    the 'whm_sysdep.h' file, which is mostly system/user dependent pathnames.
+
+
+[Done: See below]
 Very Important: 
 Note: It's ok to do yourself a manual job but..:
     The hour sheet must be editable by hand, but a user should not

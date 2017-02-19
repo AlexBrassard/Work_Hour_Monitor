@@ -425,12 +425,22 @@ whm_sheet_T* whm_init_sheet_type(void)
     sheet->day_total_hours[c] = -1.0;
     sheet->day_total_earnings[c] = -1.0;
   }
+  if ((sheet->comments = whm_init_comment_arr(WHM_DEF_NUMOF_COMMENTS)) == NULL){
+    WHM_ERRMESG("Whm_init_comment_arr");
+    goto errjmp;
+  }
   sheet->year  = -1;
   sheet->month = -1;
+  sheet->numof_comments = WHM_DEF_NUMOF_COMMENTS;
+  sheet->comment_ind = 0;
   return sheet;
 
  errjmp:
   if (sheet){
+    if (sheet->comments){
+      whm_free_comment_arr(sheet->comments, WHM_DEF_NUMOF_COMMENTS);
+      sheet->comments = NULL;
+    }
     if (sheet->day_pos_hours){
       for(i = 0; i < 8; i++)
 	if (sheet->day_pos_hours[i]){
@@ -483,6 +493,10 @@ void whm_free_sheet_type(whm_sheet_T *sheet)
   size_t i = 0;
 
   if (!sheet) return;
+  if (sheet->comments){
+    whm_free_comment_arr(sheet->comments, sheet->numof_comments);
+    sheet->comments = NULL;
+  }
   if (sheet->day_pos_hours){
     for(i = 0; i < 8; i++)
       if (sheet->day_pos_hours[i]){
@@ -543,15 +557,38 @@ whm_option_T *whm_init_option_type()
     WHM_ERRMESG("Calloc");
     goto errjmp;
   }
+  if ((option->date = calloc(WHM_NAME_STR_S, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    goto errjmp;
+  }
+  if ((option->month = calloc(WHM_NAME_STR_S, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    goto errjmp;
+  }
+  if ((option->value = calloc(WHM_VALUE_S, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    goto errjmp;
+  }
   option->operation    = NONE;
   option->year         = -1;
-  option->month        = -1;
-  option->date         = -1;
   option->worked_hours = -1.0;
+  option->field        = F_NONE;
   return option;
 
  errjmp:
   if (option){
+    if (option->value){
+      free(option->value);
+      option->value = NULL;
+    }
+    if (option->month){
+      free(option->month);
+      option->month = NULL;
+    }
+    if (option->date){
+      free(option->date);
+      option->date = NULL;
+    }
     if (option->position){
       free(option->position);
       option->position = NULL;
@@ -569,6 +606,19 @@ whm_option_T *whm_init_option_type()
 
 void whm_free_option_type(whm_option_T *option){
   if (!option) return;
+
+  if (option->value){
+    free(option->value);
+    option->value = NULL;
+  }
+  if (option->month){
+    free(option->month);
+    option->month = NULL;
+  }
+  if (option->date){
+    free(option->date);
+    option->date = NULL;
+  }
   if (option->position){
     free(option->position);
     option->position = NULL;
@@ -668,3 +718,171 @@ void whm_free_backup_type(whm_backup_T *bup)
   bup = NULL;
 
 } /* whm_free_backup_type() */
+
+
+/* Initialize a whm_comment_T* object. */
+whm_comment_T* whm_init_comment_type(void)
+{
+  whm_comment_T *comment = NULL;
+
+  if ((comment = malloc(sizeof(whm_comment_T))) == NULL){
+    WHM_ERRMESG("Malloc");
+    return NULL;
+  }
+  if ((comment->text = calloc(WHM_DEF_COMMENT_SIZE, sizeof(char))) == NULL){
+    WHM_ERRMESG("Calloc");
+    goto errjmp;
+  }
+  comment->b_offset = -1;
+  comment->e_offset = -1;
+  comment->text_s = WHM_DEF_COMMENT_SIZE;
+  return comment;
+
+ errjmp:
+  if (comment){
+    if (comment->text){
+      free(comment->text);
+      comment->text = NULL;
+    }
+    free(comment);
+  }
+
+  return NULL;
+} /* whm_init_comment_type() */
+
+
+/* Release memory allocated to a whm_comment_T object. */
+void whm_free_comment_type(whm_comment_T *comment)
+{
+  if (!comment) return;
+  if (comment->text){
+    free(comment->text);
+    comment->text = NULL;
+  }
+  free(comment);
+  comment = NULL;
+
+} /* whm_free_comment_type() */
+
+
+/* Extend the text section of a commentary up to WHM_MAX_COMMENT_SIZE bytes-1. */
+int whm_extend_comment_text(whm_comment_T *comment)
+{
+  char *new_text = NULL;
+  size_t new_size = 0;
+  
+  if (!comment) {
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
+
+  if ((new_size = comment->text_s * 2) >= WHM_MAX_COMMENT_SIZE){
+    errno = WHM_COMMENTTOOLONG;
+    return WHM_ERROR;
+  }
+  if ((new_text = realloc(comment->text, new_size * sizeof(char))) == NULL){
+    WHM_ERRMESG("Realloc");
+    return WHM_ERROR;
+  }
+  comment->text_s = new_size;
+  comment->text = new_text;
+  new_text = NULL;
+  return 0;
+
+} /* whm_extend_comment_text */
+
+whm_comment_T** whm_init_comment_arr(size_t numof_comments)
+{
+  whm_comment_T **arr = NULL;
+  size_t i = 0;
+  
+  if (!numof_comments){
+    errno = EINVAL;
+    return NULL;
+  }  
+  if ((arr = malloc(numof_comments * sizeof(whm_comment_T*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    return NULL;
+  }
+  while (i < numof_comments)
+    if ((arr[i++] = whm_init_comment_type()) == NULL){
+      WHM_ERRMESG("Whm_init_comment_type");
+      goto errjmp;
+    }
+
+  return arr;
+
+ errjmp:
+  if (arr){
+    for (i = 0; i < numof_comments; i++)
+      if (arr[i]) {
+	whm_free_comment_type(arr[i]);
+	arr[i] = NULL;
+      }
+    free(arr);
+    arr = NULL;
+  }
+  return NULL;
+} /* whm_init_comment_arr() */
+
+
+/* Release memory allocated to a whm_comment_T* array. */
+void whm_free_comment_arr(whm_comment_T **arr,
+			  size_t numof_comments)
+{
+  size_t i = 0;
+  
+  if (!arr || !numof_comments) return;
+  for (i = 0; i < numof_comments; i++)
+    if (arr[i]) {
+      whm_free_comment_type(arr[i]);
+      arr[i] = NULL;
+    }
+  free(arr);
+  arr = NULL;
+
+} /* whm_free_comment_arr() */
+
+
+/* Extend the given array of commentaries. */
+whm_comment_T** whm_extend_comment_arr(whm_comment_T **comments,
+				       size_t *cur_size)
+{
+  whm_comment_T **new_arr = NULL;
+  size_t new_size = 0;
+  size_t i = *cur_size;
+  
+  if (!comments || !cur_size || !*cur_size){
+    errno = EINVAL;
+    return NULL;
+  }
+
+  new_size = (*cur_size) * 2;
+  if ((new_arr = realloc(comments, new_size * sizeof(whm_comment_T*))) == NULL){
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  while (i < new_size)
+    if ((new_arr[i] = whm_init_comment_type()) == NULL){
+      WHM_ERRMESG("Whm_init_comment_type");
+      goto errjmp;
+    }
+  comments = new_arr;
+  *cur_size = new_size;
+  new_arr = NULL;
+
+  return comments;
+
+ errjmp:
+  if (new_arr) {
+    for (i = 0; i < new_size; i++)
+      if (new_arr[i]) {
+	whm_free_comment_type(new_arr[i]);
+	new_arr[i] = NULL;
+      }
+    free(new_arr);
+    new_arr = NULL;
+  }
+  return NULL;
+
+} /* whm_extend_comment_arr() */

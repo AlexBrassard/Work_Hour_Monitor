@@ -11,6 +11,8 @@
 
 # define WHM_ERRMESG_MAX_LENGHT 128
 
+# define WHM_ERROR              -1
+
 static const char whm_err_head[] = "Impossible to execute the requested operation: ";
 
 typedef enum whm_errcodes_type {
@@ -33,7 +35,14 @@ typedef enum whm_errcodes_type {
   WHM_INVALIDPOSITION,
   WHM_INVALIDWAGE,
   WHM_MISSINGWAGE,
-  WHM_INVALIDCOMMENT
+  WHM_INVALIDCOMMENT,
+  WHM_TOOMANYOPTIONS,
+  WHM_NODASHOPTION,
+  WHM_INVALIDARGNAME,
+  WHM_INVALIDARGVALUE,
+  WHM_INVALIDVALUE,
+  WHM_INVALIDMONTH,
+  WHM_COMMENTTOOLONG
  
 } whm_errcodes_T;
 
@@ -57,8 +66,14 @@ static const char whm_errmesg[][WHM_ERRMESG_MAX_LENGHT] = {
   "The desired position does not exists",
   "The given wage is invalid",
   "Missing a wage per hour for the given position name",
-  "Invalid commentary sequence, likely an unterminated multi-lines sequence"
-  
+  "Invalid commentary sequence, likely an unterminated multi-lines sequence",
+  "Too many options were passed via command line",
+  "Command line option name does not begin by a dash '-'",
+  "Invalid argument name passed to command line option",
+  "Command line option argument value is invalid or not present",
+  "Invalid value passed to structure",
+  "Invalid month name",
+  "Cannot register the commentary; commentary is too long"
   
 };
 
