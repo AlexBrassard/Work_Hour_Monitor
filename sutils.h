@@ -3,6 +3,10 @@
  * Safe-utils Library  -  Header and code file.
  * Version 1.0
  *
+
+ MODIFIED FOR WORK HOUR MONITOR:
+  s_ftoa().
+
  */
 
 #ifndef LIB_SAFE_UTILS_HEADER_FILE
@@ -188,7 +192,7 @@ static inline char* s_ftoa(char *dest, double src, size_t dest_s)
     return NULL;
   }
   memset(dest, '\0', dest_s);
-  if (snprintf(dest, dest_s-1, "%f", src) < 0) {
+  if (snprintf(dest, dest_s-1, "%.2f", src) < 0) {
     fprintf(stderr, "%s: Failed to print the given number to the given buffer\n\n", __func__);
     return NULL;
   }

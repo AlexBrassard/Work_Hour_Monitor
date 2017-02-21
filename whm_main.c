@@ -370,6 +370,11 @@ int main(int argc, char **argv)
   int i = 0, c_ind = 0;
   char config_bkup_name[WHM_MAX_PATHNAME_S];
 
+  /* 
+   * To prevent Valgrind from complaining that 
+   * Syscall open(filename) points to uninitialized bytes.
+   */
+  memset(config_bkup_name, '\0', WHM_MAX_PATHNAME_S);
 
   /* Initialize the array of configuration entries. */
   if ((configs = malloc(WHM_MAX_CONFIG_ENTRIES * sizeof(whm_config_T*))) == NULL){
@@ -438,8 +443,10 @@ int main(int argc, char **argv)
       goto errjmp;
     }
   }
-  fclose(stream);
-  stream = NULL;
+  if (stream){
+    fclose(stream);
+    stream = NULL;
+  }
   /* 
    * If nothing was found in the configuration file,
    * warn the user that we're going to recreate it.
@@ -498,10 +505,14 @@ int main(int argc, char **argv)
    in any ways. A user must use the proper options to safely modify the configuration file.
 
    */
-  if (whm_new_backup(WHM_CONFIGURATION_FILE,
-			config_bkup_name) == NULL){
-    WHM_ERRMESG("Whm_new_backup");
-    goto errjmp;
+  if ((stream = fopen(WHM_CONFIGURATION_FILE, "r")) != NULL){
+    fclose(stream);
+    stream = NULL;
+    if (whm_new_backup(WHM_CONFIGURATION_FILE,
+		       config_bkup_name) == NULL){
+      WHM_ERRMESG("Whm_new_backup");
+      goto errjmp;
+    }
   }
   /* Open and write the configuration file to disk. */
   if ((stream = fopen(WHM_CONFIGURATION_FILE, "w")) == NULL){
@@ -516,12 +527,15 @@ int main(int argc, char **argv)
   }
   fclose(stream);
   stream = NULL;
-  /* Remove the configuration file's backup file. */
-  if (whm_rm_backup(config_bkup_name) != 0){
-    WHM_ERRMESG("Whm_rm_backup");
-    goto errjmp;
+  if ((stream = fopen(config_bkup_name, "r")) != NULL){
+    fclose(stream);
+    stream = NULL;
+    /* Remove the configuration file's backup file. */
+    if (whm_rm_backup(config_bkup_name) != 0){
+      WHM_ERRMESG("Whm_rm_backup");
+      goto errjmp;
+    }
   }
-  
   /* Cleanup before exit. */
   if (to_write) {
     whm_free_backup_type(to_write);
