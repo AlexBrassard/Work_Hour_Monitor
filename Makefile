@@ -20,7 +20,7 @@ ${CC} = ${GNUCC}
 CFLAGS = ${GNUCFLAGS}
 
 
-OBJECTS = whm_config.o whm_gen_utils.o whm_sheet.o whm_mem_utils.o whm_main.o
+OBJECTS = whm_config.o whm_gen_utils.o whm_sheet.o whm_mem_utils.o whm_menu.o whm_main.o
 HEADERS = whm.h whm_error.h whm_sysdep.h
 
 PROGNAME = whm
@@ -40,6 +40,12 @@ whm_sheet.o : whm_sheet.c ${HEADERS}
 
 whm_mem_utils.o : whm_mem_utils.c ${HEADERS}
 	${CC} ${CFLAGS} -c whm_mem_utils.c
+
+whm_menu.o : whm_menu.c ${HEADERS}
+	${CC} ${CFLAGS} -c whm_menu.c
+
+whm_main.o : whm_main.c ${HEADERS}
+	${CC} ${CFLAGS} -c whm_main.c
 
 
 .PHONY : clean

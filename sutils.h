@@ -222,6 +222,16 @@ static inline char* s_itoa(char *dest, int src, size_t dest_s)
 } /* s_itoa() */
 
 
+/* Check if the given year is a leap year (has 366 days). */
+static inline int s_isleap(int year)
+{
+  if (!(year % 4) && (year % 100)) return 1;
+  else if (!(year % 100) && !(year % 400)) return 1;
+  return 0;
+
+} /* s_isleap() */
+
+
 #undef SPACE
 #undef USCORE
 #endif /* LIB_SAFE_UTILS_HEADER_FILE */

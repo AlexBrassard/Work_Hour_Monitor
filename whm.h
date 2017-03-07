@@ -29,7 +29,7 @@
 /* Maximum lenght of a command line option's argument. */
 # define WHM_MAX_ARG_STR_S        WHM_NAME_STR_S + WHM_MAX_PATHNAME_S + 2
 # define WHM_MAX_NUMOF_OPTIONS    256            /* Maximum number of command line options.        */
-# define WHM_PROG_NUMOF_OPTIONS   7              /* Current number of options available to use.    */
+# define WHM_PROG_NUMOF_OPTIONS   8              /* Current number of options available to use.    */
 # define WHM_MAX_NUMOF_ARG_NAMES  9              /* Number of possible argument names (see struct whm_option_type below). */
 # define WHM_MAX_CONFIG_ENTRIES   256            /* No more than 256 companies in the config file. */
 # define WHM_MAX_NUMOF_SHEETS     WHM_MAX_CONFIG_ENTRIES /* Maximum number of hour sheets in memory. */
@@ -65,8 +65,8 @@
 # define WHM_NO_TCASH             "-----.--"
 
 # define WHM_INPUTDONE            -2222          /* Used by whm_ask_user to signify input is done. */
-
 # define WHM_NOMATCH              -2             /* Used mainly by whm_validate_name() to indicate no matches were found. */
+# define WHM_CANCELED             -3             /* Used by whm_ask_user() to interactively cancel its input. */
 
 # define WHM_SHEET_TYPE           1              /* Used by whm_delete_op() to indicate a sheet file type. */
 # define WHM_CONFIG_TYPE          2              /* Used by whm_delete_op() to indicate a configuration file type. */
@@ -87,14 +87,14 @@ static const char WHM_SHEET_SUFFIX[]     = ".sheet";
 static const char WHM_LAST_SEEN_SUFFIX[] = ".LS_";
 
 /* Every supported short options. */
-static const char WHM_SHORT_OPTIONS[][WHM_SHORT_OPTION_S] = {"-h", "-d", "-a", "-m", "-u", "-p", "-l" };
+static const char WHM_SHORT_OPTIONS[][WHM_SHORT_OPTION_S] = {"-h", "-d", "-a", "-m", "-u", "-p", "-l", "-A" };
 
 /* Every supported long options. */
 static const char WHM_LONG_OPTIONS [][WHM_LONG_OPTION_S] = {
   "--help",   "--delete", 
   "--add",    "--modify", 
   "--update", "--print",
-  "--list"
+  "--list",   "--auto"
   
 };
 
@@ -109,10 +109,10 @@ static const char WHM_ARG_NAMES[][WHM_NAME_STR_S] = {
 };
 
 /* The maximum number of expected arguments for each options named above. */
-static const int WHM_MAX_ARGS_PER_OPTION[] = { 0, 3, 0, 4, 6, 3, 0 };
+static const int WHM_MAX_ARGS_PER_OPTION[] = { 0, 3, 0, 4, 6, 3, 0, 0 };
 
 /* The number of required arguments for each options. */
-static const int WHM_REQ_ARGS_PER_OPTION[] = { 0, 1, 0, 1, 1, 1, 0 };
+static const int WHM_REQ_ARGS_PER_OPTION[] = { 0, 1, 0, 1, 1, 1, 0, 0 };
 
 /* The heading message printed to a new configuration file. */
 static const char WHM_CONFIG_HEADER_MSG[] =
@@ -262,22 +262,10 @@ enum whm_option_names {
   MODIFY,
   UPDATE,
   PRINT,
-  LIST
+  LIST,
+  AUTO
  
 };
-
-/* Original Order:
-enum whm_option_names {
-  NONE = -1,
-  PRINT = 0,
-  UPDATE,
-  ADD,
-  DELETE,
-  MODIFY,
-  LIST,
-  HELP
-};
-*/
 
 typedef struct whm_option_type {
   enum whm_option_names     operation;
@@ -318,8 +306,8 @@ enum whm_question_type {
   HOLIDAY_PAY,
   ADD_COMPANY,
   /* When modifing the configuration file. */
-  MODIF_COMPANY_NAME,
-  MODIF_CONFIG_FIELD,
+  MODIF_COMPANY_NAME,  /* Reusing this question for the main menu. */
+  MODIF_CONFIG_FIELD,  /* Reusing this question for the main menu. */
   MODIF_UNKNOWN_COMPANY,
   MODIF_POSITION,
   FIELD_STATUS,
@@ -329,7 +317,10 @@ enum whm_question_type {
   FIELD_NIGHT_PRIME,
   FIELD_HOLIDAY_PAY,
   /* When updating an hour sheet. */
-  SHEET_WORKED_HOURS
+  SHEET_WORKED_HOURS,  /* Reusing this question for the main menu. */
+  /* Main menu. */
+  MAIN_MENU_CHOICE,
+  MENU_DATE
 
 };
 
@@ -357,10 +348,10 @@ typedef struct whm_backup_type {
  * Note that the size is NOT the lenght!
  */
 typedef struct whm_comment_type {
-  int                       b_offset;                      /* Begining of comments absolute file offset.(not size_T for consistency) */
-  int                       e_offset;                      /* Ending of comments absolute file offset. (not size_T for consistency) */
-  size_t                    text_s;                        /* The commentary text section size, including the terminating NULL. */
-  char                      *text;                         /* Commentary's text section.  */
+  int                       b_offset;                   /* Begining of comments absolute file offset.(not size_T for consistency) */
+  int                       e_offset;                   /* Ending of comments absolute file offset.(not size_T for consistency) */
+  size_t                    text_s;                     /* The commentary text section size, including the terminating NULL. */
+  char                      *text;                      /* Commentary's text section.  */
 
 } whm_comment_T;
  
@@ -397,6 +388,9 @@ whm_comment_T** whm_extend_comment_arr(whm_comment_T **comments, /* Extend the g
 int            whm_new_dir         (const char *dir_name); /* Create a new directory if it doesn't already exists.         */
 int            whm_get_time        (whm_time_T *time_o);   /* Get the current date in a preinitialized whm_time_T object.  */
 int            whm_clr_time        (whm_time_T *time_o);   /* Clear all fields of a whm_time_T object.                     */
+int            whm_adjust_time     (char *time_str,        /* Adjust the ->day field of a whm_time_T object. */
+				    whm_time_T *time_o,
+				    size_t time_str_s);
 char*          whm_get_string      (whm_queue_T *queue);   /* Get a string from queue.                                     */
 int            whm_set_string      (whm_queue_T *queue,    /* Add a string to queue.                                       */
 				    char *value);
@@ -422,10 +416,10 @@ int            whm_skip_sheet_comments(whm_sheet_T *sheet, /* Skip and record a 
 				       int *ind,
 				       int multi_lines);
 int            whm_validate_name   (char *name,            /* Verify that the given name exists in the configuration file. */
-				    whm_config_T **configs,
+				    whm_config_T **configs,/* (and returns its index) */
 				    int c_ind);
 int            whm_validate_position(char *name,           /* Validate the given position name. */
-				     whm_config_T *config);
+				     whm_config_T *config);/* (and return its index) */
 int            whm_validate_time_field(whm_time_T *time_o,  /* Validate the requested time field's value. */
 				       enum whm_time_field_type field);
 int            whm_get_month_number(char *month);          /* Returns the month number [1-12] for the corresponding name. */
@@ -525,12 +519,26 @@ int             whm_inter_update_sheet(whm_config_T **configs, /* Interactively 
 				       whm_sheet_T **sheets,
 				       whm_time_T *time_o,
 				       int max_ind);
-int             whm_rm_sheet         (whm_config_T *config,/* Reset all fields of the given sheet to their default values. */
+int             whm_reset_sheet      (whm_config_T *config,/* Reset all fields of a whm_sheet_T* to their default values. */
 				      whm_sheet_T *sheet);
+int             whm_rm_sheet         (whm_config_T *config,/* Remove the given sheet from disk. */
+				      whm_sheet_T *sheet); 
 int             whm_set_sheet        (whm_config_T *config,/* Add an entry to the global list of sheets to write to disk.  */
 				      whm_sheet_T *sheet);
 int             whm_write_sheet_list (whm_time_T *time_o); /* Write to disk all hour sheets in the global list "to_write". */
 void            whm_clean_sheet_list (void);               /* NULL out every objects and strings of the global list "to_write". */
+
+/*   whm_menu.c   */
+void            whm_print_main_menu(void);                 /* Print the main menu to stdout. */
+void            whm_print_positions(whm_config_T *config,  /* Print all positions of a single companie. */
+				    whm_sheet_T *sheet);
+void            whm_print_all_positions(whm_config_T **configs, /* Print all positions of all active companies. */
+					whm_sheet_T **sheets,
+					int max_ind);
+int             whm_main_menu(whm_config_T **configs,      /* Interactively prompt users for actions to take. */
+			      whm_sheet_T **sheets,
+			      whm_time_T *time_o,
+			      int *max_ind);
 
 /*   whm_main.c   */
 int             whm_automatic_mode   (whm_config_T **configs, /* Called when no options are present on the command line.   */
@@ -576,6 +584,7 @@ void whm_PRINT_sheet(whm_sheet_T *sheet,                   /* GDB debugging hook
 		     whm_config_T *config);
 void whm_PRINT_queue(whm_queue_T *queue);                  /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !! */
 void whm_PRINT_option(whm_option_T *option);               /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !! */
+void whm_PRINT_time(whm_time_T *time_o);                   /* GDB debugging hook. DO NOT CALL WITHIN A PROGRAM !! */
 /*** MACROS ***/
 
 /* Remove a trailing newline. */

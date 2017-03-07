@@ -149,6 +149,222 @@ int whm_clr_time(whm_time_T *time_o)
 } /* whm_clr_time() */
 
 
+/* 
+ * Adjust the given time object given a new time string
+ * of the form dd-mm-yyyy .
+ */
+int whm_adjust_time(char *time_str,
+		    whm_time_T *time_o,
+		    size_t time_str_s)
+{
+  char **date = NULL;
+  char strftime_str[WHM_TIME_STR_S];
+  char temp_str[WHM_TIME_STR_S];
+  int numof_monthly_days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  int year_day = 0;                /* (1-366) */
+  int month = 0;                   /* (1-12)  */
+  int day = 0;                     /* (1-31)  */
+  int leap_year = 0, year = 0;
+  int week_num = 0;
+  int current_year = 0, current_month = 0, current_day = 0;
+  int day_ind = 0;
+  time_t t;
+  struct tm *temp = NULL;
+  whm_time_T *current_time = NULL;
+
+  if ((current_time = whm_init_time_type()) == NULL){
+    WHM_ERRMESG("Whm_init_time_type");
+    return WHM_ERROR;
+  }
+  if (whm_get_time(current_time) == WHM_ERROR){
+    WHM_ERRMESG("Whm_get_time");
+    goto errjmp;
+  }
+  if ((date = malloc(3 * sizeof(char*))) == NULL) {
+    WHM_ERRMESG("Malloc");
+    goto errjmp;
+  }
+  for (int i = 0; i < 3; i++)
+    if ((date[i] = calloc(WHM_TIME_STR_S, sizeof(char))) == NULL){
+      WHM_ERRMESG("Calloc");
+      goto errjmp;
+    }
+
+  if (s_split(date, time_str, 3,
+	      time_str_s, WHM_TIME_STR_S, '-') == NULL){
+    WHM_ERRMESG("S_split");
+    goto errjmp;
+  }
+  /* Date was given in the form: dd-mm-yyyy */
+  if (s_strcpy(time_o->date, date[0], WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+  if (s_strcpy(time_o->month, date[1], WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+  if (s_strcpy(time_o->year, date[2], WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+  /* This is ugly, the "field" argument should handle multiple flags. */
+  if (!whm_validate_time_field(time_o, T_DATE)
+      || !whm_validate_time_field(time_o, T_MONTH)
+      || !whm_validate_time_field(time_o, T_YEAR)){
+    WHM_ERRMESG("Whm_validate_time_field");
+    goto errjmp;
+  }
+  t = time(NULL);
+  temp = localtime(&t);
+  if (!temp) {
+    WHM_ERRMESG("Localtime");
+    goto errjmp;
+  }
+  memset(strftime_str, '\0', WHM_TIME_STR_S);
+  if (strftime(strftime_str, WHM_TIME_STR_S, "%j", temp) == 0){
+    WHM_ERRMESG("Strftime");
+    goto errjmp;
+  }
+  week_num = atoi(current_time->week);
+  year_day = atoi(strftime_str);
+  year = atoi(time_o->year);
+  month = atoi(time_o->month);
+  day = atoi(time_o->date);
+  current_year = atoi(current_time->year);
+  current_month = atoi(current_time->month);
+  current_day = atoi(current_time->date);
+  for (; day_ind < 7; day_ind++)
+    if (s_strstr(WHM_EN_DAYS[day_ind], current_time->day,
+		 WHM_TIME_STR_S,  LS_ICASE) == 0) break;
+  if (day_ind > 6) {
+    errno = WHM_INVALIDELEMCOUNT;
+    goto errjmp;
+  }
+
+  /* 
+   * Find time_o's ->day and ->week fields from its
+   * ->date, ->month and ->year fields.
+   */
+  if (year > current_year) { /* Very likely the sheet doesn't exist yet.. */
+    errno = WHM_INVALIDYEAR;
+    goto errjmp;
+  }
+  if (month > current_month) {
+    while(1) {
+      if ((leap_year && year_day > 367) 
+	  || (year_day > 366)) {
+	++current_year;
+	year_day = 1;
+	if (s_isleap(current_year)) leap_year = 1;
+	else leap_year = 0;
+      }
+      if (++day_ind > 6) {
+	day_ind = 0;
+	if (++week_num > 53) week_num = 0;
+      }
+      ++current_day;
+      if (leap_year && current_month == 2){
+	if (current_day >= (numof_monthly_days[current_month-1])+1) {
+	  current_day = 0;
+	  if (++current_month > 12) current_month = 1;
+	}
+      }
+      else {
+	if (current_day >= numof_monthly_days[current_month-1]) {
+	  current_day = 0;
+	  if (++current_month > 12) current_month = 1;
+	}
+      }
+
+      if (year == current_year
+	  && month == current_month
+	  && day == current_day) break;
+    }
+  }
+  else if (month == current_month) {
+    while (current_day != day) {
+      if (++day_ind > 6) {
+	day_ind = 0;
+	if (++week_num > 53) week_num = 0;
+      }
+      if (++current_day > 31) current_day = 1;
+    }
+  }
+  else {
+    while(1) {
+      if (--year_day == 0) {
+	--current_year;
+	if (s_isleap(current_year)) {
+	  leap_year = 1;
+	  year_day = 367;
+	}
+	else {
+	  leap_year = 0;
+	  year_day = 366;
+	}
+      }
+      if (--day_ind < 0) {
+	day_ind = 6;
+	if (--week_num == 0) week_num = 53;
+      }
+      if (--current_day == 0) {
+	--current_month;
+	if (current_month <= 0) current_month = 12;
+	if (current_month == 2 && leap_year)
+	  current_day = numof_monthly_days[current_month-1]+1;
+	else
+	  current_day = numof_monthly_days[current_month-1];
+      }
+      if (year == current_year
+	  && month == current_month
+	  && day == current_day) break;
+    }
+  }
+  if (s_strcpy(time_o->day, (char*)WHM_EN_DAYS[day_ind], WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+  if (s_strcpy(time_o->week, s_itoa(temp_str, week_num, WHM_TIME_STR_S), WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+
+  if (current_time){
+    whm_free_time_type(current_time);
+    current_time = NULL;
+  }
+  if (date){
+    for (int i = 0; i < 3; i++)
+      if (date[i]) {
+	free(date[i]);
+	date[i] = NULL;
+      }
+    free(date);
+    date = NULL;
+  }
+
+  return 0;
+
+ errjmp:
+  if (current_time){
+    whm_free_time_type(current_time);
+    current_time = NULL;
+  }
+  if (date){
+    for (int i = 0; i < 3; i++)
+      if (date[i]) {
+	free(date[i]);
+	date[i] = NULL;
+      }
+    free(date);
+    date = NULL;
+  }
+  return WHM_ERROR;
+  
+} /* whm_adjust_time() */
+
+
 char* whm_get_string(whm_queue_T *queue)
 {
   char *temp;
@@ -431,6 +647,14 @@ int whm_ask_user(enum whm_question_type question,
 	   config->positions[pos_ind], config->employer);
     break;
 
+  case MAIN_MENU_CHOICE:
+    printf("Votre choix: ");
+    break;
+
+  case MENU_DATE:
+    printf("Entrez la date a modifier (jj-mm-aaaa): ");
+    break;
+
   default:
     errno = WHM_BADQUESTION;
     goto errjmp;
@@ -441,9 +665,15 @@ int whm_ask_user(enum whm_question_type question,
   while (i < WHM_NUMOF_EOI_STRINGS)
     if (strcmp(answer, WHM_END_OF_INPUT[i++]) == 0)
       return WHM_INPUTDONE;
+  /* 
+   * "cancel" has a special meaning when whm_ask_user is 
+   * used for menus questions, instead of quitting, the user must
+   * be brought back to the previous menu or exit if called from the main menu.
+   */
   if (s_strcmp(answer, "cancel", answer_s, LS_ICASE) == 0
       || s_strcmp(answer, "exit", answer_s, LS_ICASE) == 0){
     printf("\nCanceled\n\n");
+    if (question >= MAIN_MENU_CHOICE) return WHM_CANCELED;
     exit(EXIT_SUCCESS);
   }    
   answer[answer_s-1] = '\0';

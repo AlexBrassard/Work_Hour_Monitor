@@ -17,18 +17,24 @@ P------  Pseudocoded
 
 STATUS	  NAME			     FILE		   DESCRIPTION
 
-PC-----	  whm_automatic_mode	     whm_main.c		   Executed when no command line options are present.
 PC-----	  whm_parse_options	     whm_main.c		   Parse and execute command line options.
 PC-----	  whm_get_args		     whm_main.c		   Get arguments for an option from argv.
 -C-----	  whm_sort_op		     whm_main.c		   Sort operations by types.
--C-----** whm_help_op		     whm_main.c		   --help.
--C-----	  whm_print_op		     whm_main.c		   --print (hour sheet/config) option.
--C-----	  whm_update_op		     whm_main.c		   --update (hour sheet) option.
--C-----	  whm_add_op		     whm_main.c		   --add (to config) option.
--C-----	  whm_del_op		     whm_main.c		   --delete (from config) option.
--C-----	  whm_modify_op		     whm_main.c		   --modify (config entry).
--C-----	  whm_list_op		     whm_main.c		   --list (config company names) option.
+PC---T-	  whm_automatic_mode	     whm_main.c		   --auto.
+-C---T-** whm_help_op		     whm_main.c		   --help.
+-C---T-	  whm_print_op		     whm_main.c		   --print (hour sheet/config) option.
+-C---T-	  whm_update_op		     whm_main.c		   --update (hour sheet) option.
+-C---T-	  whm_add_op		     whm_main.c		   --add (to config) option.
+-C---T-	  whm_del_op		     whm_main.c		   --delete (from config) option.
+-C---T-	  whm_modify_op		     whm_main.c		   --modify (config entry).
+-C---T-	  whm_list_op		     whm_main.c		   --list (config company names) option.
 PC-----	  main			     whm_main.c		   Work Hour Monitor.
+
+------A	  whm_main_menu		     whm_menu.c		   Called when no command line options are present.
+-C-----	  whm_print_main_menu	     whm_menu.c		   Print the main menu to stdout.
+-C-----	  whm_print_positions	     whm_menu.c		   Print all position names of a single company.
+-C-----	  whm_print_all_positions    whm_menu.c		   Print all active companys' positions.
+-C-----   whm_modify_previous_date   whm_menu.c		   Modify the number of hours worked of a past date.
 
 -C-----	  whm_init_day_type	     whm_mem_utils.c
 -C-----	  whm_free_day_type	     whm_mem_utils.c
@@ -56,7 +62,8 @@ PC-----	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_new_dir	 	     whm_gen_utils.c       Create a new directory.
 -C-----	  whm_get_time		     whm_gen_utils.c	   Populate a whm_time_T* object.
 -C-----	  whm_clr_time		     whm_gen_utils.c	   Cleanup a whm_time_T* object.
--C-----	  whm_find_first_dom	     whm_gen_utils.c	   Find what's the first weekday of the current month, and fetches week number.
+-C-----	  whm_adjust_time	     whm_gen_utils.c	   Adjust a time object's time according to the given time string.
+-C-----	  whm_find_first_dom	     whm_gen_utils.c	   Find the first weekday of the current month, fetches week number.
 -C-----	  whm_get_string	     whm_gen_utils.c	   Get a string from the given queue.
 -C-----	  whm_set_string	     whm_gen_utils.c	   Save a string in the given queue.
 -C-----	  whm_new_bkup  	     whm_gen_utils.c	   Create a backup of the given file.
@@ -97,6 +104,7 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -C-----	  whm_clean_sheet_list	     whm_sheet.c	   Null out every pointers in the global sheet list.
 -C-----	  whm_set_sheet		     whm_sheet.c	   Add a sheet and a config entry to the list to be written to disk.
 -C-----	  whm_make_sheet_path	     whm_sheet.c	   Build a new sheet's absolute pathname.
+-C-----	  whm_reset_sheet	     whm_sheet.c	   Reset all fields of a given sheet to their default values.
 -C---T-	  whm_rm_sheet		     whm_sheet.c	   Delete an existing hour sheet (File + data).
 -C---T-	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
 -C---T-	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet.
@@ -108,7 +116,7 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 -CM----	  WHM_TRIM_NEWLINE	     whm.h		   Trim a trailing newline from a given string.
 -CM----	  WHM_REPLACE_SPACE	     whm.h		   Replace a space character by an underscore.
 
--C-I---   Safe-utils Library         sutils.h		   Small collection of useful utilities (all s_ functions).
+-C-I---   Safe-utils Library         sutils.h		   Small collection of useful utilities (all s_ prefixed functions).
 
 -C-----	  whm_PRINT_config	     whm_main.c		   GDB HOOK - Print all informations of a whm_config_T* object.
 -C-----	  whm_PRINT_sheet	     whm_main.c		   GDB HOOK - Print all informations of a whm_sheet_T* object.

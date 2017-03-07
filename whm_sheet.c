@@ -861,8 +861,8 @@ void whm_get_week_totals(whm_sheet_T *sheet,
       }
 
     }
-    if (config->do_pay_holiday) sheet->week[week_ind]->total_hours +=
-				  ((sheet->week[week_ind]->total_hours * 4)/100);
+    if (config->do_pay_holiday) sheet->week[week_ind]->total_earnings +=
+				  ((sheet->week[week_ind]->total_earnings * 4)/100);
   }
 } /* whm_get_week_totals() */
 
@@ -950,9 +950,6 @@ void whm_get_sheet_cumuls(whm_sheet_T *sheet,
  * active companies in the configuration file.
  * This function is assuming the sheets to update have already been
  * read in memory (by whm_automatic_mode()) before being called.
-
- **** This functions is to be called only from whm_automatic_mode() ****
-
  */
 int whm_inter_update_sheet(whm_config_T **configs,
 			   whm_sheet_T **sheets,
@@ -1031,7 +1028,6 @@ int whm_inter_update_sheet(whm_config_T **configs,
 int whm_rm_sheet(whm_config_T *config,
 		 whm_sheet_T *sheet)
 {
-  int week_ind = 0, day_ind = 0, pos_ind = 0;
 
   if (!config || !sheet) {
     errno = EINVAL;
@@ -1046,7 +1042,25 @@ int whm_rm_sheet(whm_config_T *config,
       WHM_ERRMESG("Unlink");
       return WHM_ERROR;
     }
-  
+  if (whm_reset_sheet(config, sheet) != 0) {
+    WHM_ERRMESG("Whm_reset_sheet");
+    return WHM_ERROR;
+  }
+
+  return 0;
+} /* whm_rm_sheet() */
+
+
+/* Reset all whm_sheet_T fields to their default. */
+int whm_reset_sheet(whm_config_T *config,
+		    whm_sheet_T *sheet)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+
+  if (!sheet || !config) {
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
   memset(sheet->path, '\0', WHM_MAX_PATHNAME_S);
   sheet->year = 0;
   sheet->month = 0;
@@ -1072,7 +1086,8 @@ int whm_rm_sheet(whm_config_T *config,
   }
 
   return 0;
-} /* whm_rm_sheet() */
+  
+} /* whm_reset_sheet() */
 
 
 /* 

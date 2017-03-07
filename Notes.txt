@@ -5,7 +5,33 @@
  */
 TOP
 ----
-Very Important.
+Very Important:
+Note: User interface is getting a menu:
+    whm_automatic_mode will be changed into an option (whm --auto) that takes no
+    arguments. When whm will be invoked by itself without command line options,
+    A menu will appear on the screen with the following elements:
+     - Enter daily hours.
+     - Modify entered hours.
+     - Display an existing hour sheet.
+     - Display the program's configuration file.
+     - Display monthly, per week summary of an active company.
+     - Edit the program's configuration file.
+     - Recalculate a given company's hour sheet.
+     - Recalculate all hour sheets.
+
+  Side Note:
+    When inputing "exit" or a synonym the program should actualy exit..!
+
+  Side Note:
+    For the menu interface to be able to use the global list of sheets
+    to write to disk, the whm_backup_T data type must be modified to include
+    a time object pointer proper to the sheet with the same index.
+    Each sheets must be associated a time object. (Atm only 1 is created and passed along the program.)
+    whm_write_sheet_list() must be modified to take no parameters and
+    instead use the time object pointer within the whm_backup_T structure.
+
+
+Very Important:
 Note: Ignore any comments your hear, but remember all of them just in case:
     Since the configuration file should not be edited by hand,
     the position of commentaries and the comments themselfs should not

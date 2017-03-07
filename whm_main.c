@@ -227,7 +227,7 @@ int whm_parse_options(int argc, char **argv,
   for (i = 0; i < opt_ind; i++)
     switch(options[i]->operation) {
     case HELP:
-      /* Call whm_help_op() here. */
+      whm_help_op();
       break;
     case PRINT:
       if (whm_print_op(options[i], configs, sheets, time_o, *max_ind) != 0){
@@ -261,6 +261,12 @@ int whm_parse_options(int argc, char **argv,
       break;
     case LIST:
       whm_list_op(configs, *max_ind);
+      break;
+    case AUTO:
+      if (whm_automatic_mode(configs, sheets, time_o, *max_ind) != 0){
+	WHM_ERRMESG("Whm_automatic_mode");
+	goto errjmp;
+      }
       break;
     default:
       /* Should never reach this statement, a bad operation should be caught a little above. */
@@ -486,11 +492,11 @@ int main(int argc, char **argv)
     }
   }
   else 
-    if (whm_automatic_mode(configs, sheets, time_o, c_ind) != 0){
-      WHM_ERRMESG("Whm_automatic_mode");
+    /* Menu goes here. */
+    if (whm_main_menu(configs, sheets, time_o, &c_ind) != 0){
+      WHM_ERRMESG("Whm_main_menu");
       goto errjmp;
     }
-  
   /* Write every sheet that has been modified to disk now. */
   if (whm_write_sheet_list(time_o) != 0){
     WHM_ERRMESG("Whm_write_sheet_list");
@@ -611,13 +617,13 @@ void whm_help_op(void)
   fputs("\nWork Hour Monitor\n\n\n", stderr);
   fputs("Options disponibles:\n\n", stderr);
   fputs("\t-h\t--help\t\t\t\tCe message.\n\n", stderr);
-  fputs("\t-p\t--print [nom] [annee] [mois]\n", stderr);
+  fputs("\t-p\t--print name=[nom] year=[annee] month=[mois]\n", stderr);
   fputs("\t\t\t\t\t\tImprime a l'ecran la plus recente feuille de temps de \"nom\"\n", stderr);
   fputs("\t\t\t\t\t\t\"mois\" et \"annee\" sont optionels et servent a preciser\n", stderr);
   fputs("\t\t\t\t\t\tle mois et l'annee, respectivement, de la feuille desiree.\n", stderr);
   fputs("\t\t\t\t\t\tSi \"config\" est donnee comme \"nom\", WHM imprime le fichier de\n", stderr);
   fputs("\t\t\t\t\t\tconfiguration a l'ecran et quitte.\n\n", stderr);
-  fputs("\t-u\t--update [nom] [position] [heures] [date]\n", stderr);
+  fputs("\t-u\t--update name=[nom] position=[position] hours=[heures] date=[date]\n", stderr);
   fputs("\t\t\t\t\t\tMet a jour la plus recente feuille de temps de \"nom\".\n", stderr);
   fputs("\t\t\t\t\t\t\"position\", \"heures\" et \"date\" sont optionnels et servent\n", stderr);
   fputs("\t\t\t\t\t\ta preciser la position a mettre a jour, le nombres d'heures travaillees\n", stderr);
@@ -625,12 +631,12 @@ void whm_help_op(void)
   fputs("\t\t\t\t\t\tLe parametre \"heures\" dois obligatoirement etre precede par \"position\"\n", stderr);
   fputs("\t\t\t\t\t\tsinon une erreur est retourne a l'utilisateur et le programme quitte.\n\n", stderr);
   fputs("\t-a\t--add\t\t\t\tAjouter une companie au fichier de configuration [Interactif].\n\n", stderr);
-  fputs("\t-d\t--delete [type] [nom] [annee] [mois]\n", stderr);
+  fputs("\t-d\t--delete type=[type] name=[nom] year=[annee] month=[mois]\n", stderr);
   fputs("\t\t\t\t\t\tLorsque \"type\" indique \"config\", supprime l'entree \"nom\" du fichier\n", stderr);
   fputs("\t\t\t\t\t\tde configuration. Lorsque \"type\" indique \"sheet\", supprime\n", stderr);
   fputs("\t\t\t\t\t\tla plus recente feuille de temps de \"nom\". \"annee\" et \"mois\" servent\n", stderr);
   fputs("\t\t\t\t\t\ta preciser le mois et l'annee, respectivement, de la feuille de temps a supprimer.\n\n", stderr);
-  fputs("\t-m\t--modify [nom] [position] [champ] [valeur]\n", stderr);
+  fputs("\t-m\t--modify name=[nom] position=[position] field=[champ] value=[valeur]\n", stderr);
   fputs("\t\t\t\t\t\tModifie les valeurs de configuration de la companie \"nom\".\n", stderr);
   fputs("\t\t\t\t\t\t\"position\", \"champ\" et \"valeur\" sont optionnels et servent\n", stderr);
   fputs("\t\t\t\t\t\ta preciser la position a laquel la modification s'applique, le champ\n", stderr);
@@ -1212,3 +1218,11 @@ void whm_PRINT_option(whm_option_T *option)
 	  option->year, option->month,
 	  option->date, option->worked_hours);
 } /* whm_PRINT_option() */
+
+
+void whm_PRINT_time(whm_time_T *time_o)
+{
+  fprintf(stderr, "Day  name: %s\nDate: %s\nWeek number: %s\nMonth number: %s\nYear: %s\n\n",
+	  time_o->day, time_o->date, time_o->week,
+	  time_o->month, time_o->year);
+} /* whm_PRINT_time() */
