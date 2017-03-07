@@ -12,4 +12,4 @@ It is advised to edit the confiuration file via whm options only.
 When the program is run, it checks if the current day's entry are filled and if not
 prompt the user to fill them.
 
-
+This repository is used mainly as a backup directory, my appologies for the mess.
