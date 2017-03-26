@@ -1,0 +1,70 @@
+From each position's number of hours/earnings for each days:
+Calculate the total of hours/earnings, ALL combined for each days.
+Calculate the total of hours/earnings, per positions, for each weeks.
+Calculate the total of hours/earnings, ALL combined for each weeks.
+
+int week_numof_hours = 0;
+
+Call whm_reset_overtime to transfer overtime hours to regular hours.
+
+For each weeks,
+  int overtime_reached = 0;   1 when the overtime limit has been reached for the current week.
+
+  If it's the first day of the week,
+  and it's the first week of the sheet,
+  and the date is equal to -1
+    (Make a function to fetch the previous month's last [incomplete] week number of hours)
+    Fetch the previous month's last week number of hours.
+  For each days,
+   For each positions,
+     If there's no hours, skip this position.
+     Add the number of hours to this week total of hours.
+     Add the number of hours to this day's total of hours.
+     If this week total of hours is bigger or equal to 40
+       If the overtime isn't reached yet
+         Copy the number of regular hours (for today) higher than 40 to overtime hours.
+	 Substract this number from regular hours.
+       Else
+         Copy the number of regular hours to overtime hours.
+	 Set regular hours to 0.
+       If it's a night shift
+       and the night prime is higher than 0,
+         Add the prime amount to the position's wage.
+       Calculate overtime earnings adding the appropriate overtime rate.
+       Add the number of overtime hours and earnings of this position's total of overtime hours/earnings of this week.
+       Add the overtime earnings to this week's total earnings. (Hours were added few steps above.)
+       Add the overtime earnings to today's total of earnings.
+     If it's a night shift
+     and the night prime is higher than 0,
+       Add the prime amount to the position's wage.
+     Calculate the regular earnings for this position.
+     Add the regular earnings to this position's total earnings for this week.
+     Add the regular earnings to this week's total earnings.
+     Add the regular earnings to today's total earnings.
+   If the 4% holiday pay gets paid every pay,
+     Calculate it now.
+
+
+void whm_reset_overtime(whm_sheet_T *sheet,
+     		        whm_config_T *config)
+
+  For each weeks,
+    For each days,
+      For each positions,
+      If overtime hours are present,
+        Set the corresponding earnings to -1.
+        Copy the number of ot_hours to regular hours.
+
+
+int whm_complete_week(whm_sheet_T *sheet,
+    		      whm_config_T *config,
+                      whm_time_T *time_o)
+
+  From the given time object or from
+  the given sheet's time object if it isn't NULL,
+  Make a local time object for the previous month from the one given.
+  Make a pathname for an hour sheet for the given company with this local time object.
+  Find the number of hours for the last week of the previous month's sheet.
+  Make sure that this week isn't complete (Not finishing on a saturday).
+  Return the number of hours for that week.
+  

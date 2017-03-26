@@ -98,13 +98,13 @@ int whm_add_config(int *c_ind,                   /* Index of the first free elem
 
   /*
    * Refer to whm.h for informations on the whm_config_T data type.
-   * Long story short, there are 4 elements in the structure that 
+   * Long story short, there are 6 elements in the structure that 
    * the user must give information about.
    */
   printf("\nAjout d'une compagnie au fichier de configuration.\n\n");
   
   element_c = 0;
-  while (element_c < 4) {
+  while (element_c < 6) {
     int pos_ind = 0;
     ret = 0;
     memset(answer, '\0', WHM_NAME_STR_S);
@@ -209,12 +209,39 @@ int whm_add_config(int *c_ind,                   /* Index of the first free elem
       /* Save the number of positions. */
       configs[*c_ind]->numof_positions = (size_t)pos_ind;
       break;
+
+      /* User receives time and a half after 40 hours. */
+    case 4:
+      if (whm_ask_user(TIME_N_HALF,
+		       answer, WHM_NAME_STR_S,
+		       NULL, 0) != 0){
+	WHM_ERRMESG("Whm_ask_user");
+	goto errjmp;
+      }
+      if (answer[0] == 'o' || answer[0] == 'O')
+	configs[*c_ind]->time_n_half_after_40 = 1;
+      else
+	configs[*c_ind]->time_n_half_after_40 = 0;
+      break;
+
+    case 5:
+      if (whm_ask_user(DOUBLE_TIME,
+		       answer, WHM_NAME_STR_S,
+		       NULL, 0) != 0){
+	WHM_ERRMESG("Whm_ask_user");
+	goto errjmp;
+      }
+      if (answer[0] == 'o' || answer[0] == 'O')
+	configs[*c_ind]->double_time_after_50 = 1;
+      else
+	configs[*c_ind]->double_time_after_50 = 0;
+      break;
       
     default:
       errno = WHM_INVALIDELEMCOUNT;
       goto errjmp;
     }
-    if (ret == WHM_INPUTDONE) break;
+    if (ret == WHM_INPUTDONE && element_c > 5) break;
     ++element_c;
   }
   
@@ -275,7 +302,7 @@ int whm_get_config_entry(whm_config_T *config,
     return WHM_ERROR;
   }
 
-  for (line_count = 0; line_count < 8; line_count++){
+  for (line_count = 0; line_count < 10; line_count++){
     memset(line, '\0', WHM_LINE_BUFFER_S);
     memset(word, '\0', WHM_NAME_STR_S);
     pos_ind = 0;
@@ -292,7 +319,7 @@ int whm_get_config_entry(whm_config_T *config,
 
     /* Substract 1 cause line_count gets incremented every end of loop. */
     if (line[0] == NEWLINE) {
-      --line_count;
+      if (line_count > 0) --line_count;
       continue;
     }
     else WHM_TRIM_NEWLINE(line);
@@ -371,6 +398,12 @@ int whm_get_config_entry(whm_config_T *config,
 
     case 7:
       config->do_pay_holiday = atoi(line);
+      break;
+    case 8:
+      config->time_n_half_after_40 = atoi(line);
+      break;
+    case 9:
+      config->double_time_after_50 = atoi(line);
       break;
 
     default:
@@ -472,18 +505,12 @@ int whm_write_config(int c_ind,
     fprintf(stream, "\n");
     for (i = 0; i < (int)configs[cur_ind]->numof_positions; i++)
       fprintf(stream, "%.2f ", configs[cur_ind]->wages[i]);
-    fprintf(stream, "\n%s\n%zu\n\n",
+    fprintf(stream, "\n%s\n%zu\n%d\n%d\n\n",
 	    configs[cur_ind]->night_prime,
-	    configs[cur_ind]->do_pay_holiday);
+	    configs[cur_ind]->do_pay_holiday,
+	    configs[cur_ind]->time_n_half_after_40,
+	    configs[cur_ind]->double_time_after_50);
   }
-  /* 
-  fclose(stream);
-  stream = NULL;
-    if (chmod(config_path, 0600) != 0){
-    WHM_ERRMESG("Chmod");
-    return WHM_ERROR;
-    }*/
-
 
   return 0;
 

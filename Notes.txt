@@ -6,6 +6,46 @@
 TOP
 ----
 Very Important:
+Note: Keeping on working passed forty hours should be rewarding:
+   During the creation of a new configuration entry, the user must
+   be asked if overtime is paid, if yes how much it's paid (cash or percentage).
+   The overtime must be added to the calculs and a symbol needs to be added to
+   hour sheets to indicate overtime hours.
+   (Note that another symbol must be added to indicate if the shift was a day or night shift.)
+   (See SLB...Fevrier... .sheet in the current directory for an example. )
+     - 2 flags are added to whm_config_T: time_n_half_after_40 and double_time_after_50.
+       When set 0 it has no effect. When > 0, if the weekly amount of hour reaches 40 and 50
+       pay gets calculated as (wage+(wage/2)) * hours and (wage+wage) * hours, respectively.
+     - 2 new arrays are created in the whm_day_T data type to record ther per position
+       number of hours and earnings of overtime made this day.
+     - The overtime rows of an hour sheet are optional and will only be present if overtime
+       was made during that week.
+     - whm_write_sheet() must be modified to handle this new feature.
+     [ Implemented ]
+       whm_read_sheet() must be modified to handle the new feature.
+     [ Implemented ]
+       whm_update_sheet() must be modified to handle the new feature.
+         + When the first of the month begins on any other day than sunday,
+	   whm should check the last [incomplete] week of the previous month
+	   to calculate the totals of reg/over time.
+	 + An incomplete week at the end of a month should not have it's totals
+	   calculated within the current month, but instead it should be calculated
+	   in the first week of the next month. The daily hours/earnings should still be
+	   in their respective month.
+	 + Whm should provides its users a convinient way of checking more than
+	   1 month at a time.
+	 . Overtime should be calculated as a separate step, inbetween
+	   whm_get_week_totals() and whm_get_sheet_cumuls().
+	 . It's safe to assume that the overtime hours are the last ones of any week
+	   above the regular hours threshold (someplaces it's 40, other 44 etc..)  -> Check labor laws <-
+	 . Any hours that is labeled "overtime" should be substracted from the regular hours
+	   (since at this point, daily/weekly hours have been calculated already).
+	   
+	   HERE HERE HERE
+	   position indexing seems wrong and overtime (and time in general) is now
+	   off by alot... 
+
+Very Important:
 Note: User interface is getting a menu:
     whm_automatic_mode will be changed into an option (whm --auto) that takes no
     arguments. When whm will be invoked by itself without command line options,
@@ -22,14 +62,28 @@ Note: User interface is getting a menu:
   Side Note:
     When inputing "exit" or a synonym the program should actualy exit..!
 
-  Side Note:
-    For the menu interface to be able to use the global list of sheets
+  Side Note: [Done: see '->' below]
+    Because the whm_modify_previous_date function modifies the time object
+    it receives by its caller, to be able to use the global list of sheets
     to write to disk, the whm_backup_T data type must be modified to include
     a time object pointer proper to the sheet with the same index.
     Each sheets must be associated a time object. (Atm only 1 is created and passed along the program.)
     whm_write_sheet_list() must be modified to take no parameters and
     instead use the time object pointer within the whm_backup_T structure.
+    The function whm_modify_previous_date() (not yet in whm.h) is taking care of
+    opening, backing up, updating, writing and closing each sheet encountered.
+    This was much more simple to implement than changing the way time objects are
+    handled in the whole program. 
 
+  * The same problem arise from the whm_recalculate_year() function that must
+    modify its time object in order to write consistent data back to disk...
+ ->  - Add a field of type whm_time_T* to the whm_sheet_T data type that
+      would be initialized only when a sheet needs to use a date other
+      than today's date. When NULL, main()'s time object (today's date)
+      will be used as usual.
+      Modify the whm_write_sheet_list() function so that it handles this
+      new whm_sheet_T structure field properly.
+      
 
 Very Important:
 Note: Ignore any comments your hear, but remember all of them just in case:

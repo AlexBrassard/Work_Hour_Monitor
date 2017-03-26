@@ -35,6 +35,8 @@ PC-----	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_print_positions	     whm_menu.c		   Print all position names of a single company.
 -C-----	  whm_print_all_positions    whm_menu.c		   Print all active companys' positions.
 -C-----   whm_modify_previous_date   whm_menu.c		   Modify the number of hours worked of a past date.
+-C-----	  whm_recalculate_year	     whm_menu.c		   Recalculate each sheets for the given year of a single company.
+-C-----	  whm_recalculate_year_all   whm_menu.c		   Recalculate each sheets for all active companies.
 
 -C-----	  whm_init_day_type	     whm_mem_utils.c
 -C-----	  whm_free_day_type	     whm_mem_utils.c
@@ -62,6 +64,7 @@ PC-----	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_new_dir	 	     whm_gen_utils.c       Create a new directory.
 -C-----	  whm_get_time		     whm_gen_utils.c	   Populate a whm_time_T* object.
 -C-----	  whm_clr_time		     whm_gen_utils.c	   Cleanup a whm_time_T* object.
+-C-----	  whm_copy_time		     whm_gen_utils.c	   Copy src time object into dest time object.
 -C-----	  whm_adjust_time	     whm_gen_utils.c	   Adjust a time object's time according to the given time string.
 -C-----	  whm_find_first_dom	     whm_gen_utils.c	   Find the first weekday of the current month, fetches week number.
 -C-----	  whm_get_string	     whm_gen_utils.c	   Get a string from the given queue.
@@ -69,6 +72,7 @@ PC-----	  main			     whm_main.c		   Work Hour Monitor.
 -C-----	  whm_new_bkup  	     whm_gen_utils.c	   Create a backup of the given file.
 -C-----	  whm_rm_bkup	             whm_gen_utils.c	   Remove a given backup file.
 -C-----	  whm_ask_user		     whm_gen_utils.c	   Ask the user via stdin the requested information.
+-C-----	  whm_make_year_path	     whm_gen_utils.c	   Make the given year's pathname. 
 -C-----	  whm_new_year_dir	     whm_gen_utils.c	   Check existance or create a yearly sheet directory for a given company.
 -C-----	  whm_skip_comments	     whm_gen_utils.c	   Skip a commentary character sequence.
 -C-----	  whm_skip_sheet_comments    whm_gen_utils.c	   Skip and record position of the given hour sheet comment sequence.
@@ -107,11 +111,14 @@ PC---T-	  whm_inter_modify_config    whm_config.c          Interactive wrapper a
 -C-----	  whm_reset_sheet	     whm_sheet.c	   Reset all fields of a given sheet to their default values.
 -C---T-	  whm_rm_sheet		     whm_sheet.c	   Delete an existing hour sheet (File + data).
 -C---T-	  whm_inter_update_sheet     whm_sheet.c	   Interactive wrapper arround whm_update_sheet.
--C---T-	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet.
+PC---T-	  whm_update_sheet	     whm_sheet.c	   Update an hour sheet. [New pseudocode]
 -C-----	  whm_reset_totals           whm_sheet.c           Reset all sheet totals to -1.0.
-PC-----	  whm_get_day_totals	     whm_sheet.c	   Calculate the totals of hours/earnings for each days of the month.
-PC-----	  whm_get_week_totals	     whm_sheet.c	   Calculate the totals of hours/earnings for each weeks of the month.
-PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulative part.
+PC-----	  whm_reset_overtime	     whm_sheet.c	   Transfer overtime hours to regular hours for a recalculation.
+PC-----	  whm_complete_week	     whm_sheet.c	   Get hours of the last incomplete week of the previous month.
+-C-----   whm_get_numof_pos_worked   whm_sheet.c	   Get the number of position worked for a single day.
+-C-----	  whm_last_worked_day	     whm_sheet.c	   Return the index of the last worked day for a given week.
+------A	  whm_print_summary	     whm_sheet.c	   Print a single company's weekly/monthly/yearly summary.
+------A	  whm_print_summary_all	     whm_sheet.c	   Print all active companies' weekly/monthly/yearly summaries.
 
 -CM----	  WHM_TRIM_NEWLINE	     whm.h		   Trim a trailing newline from a given string.
 -CM----	  WHM_REPLACE_SPACE	     whm.h		   Replace a space character by an underscore.
@@ -141,9 +148,14 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 ----OT-++ whm_print_sheet	     whm_sheet.c	   Print an hour sheet to stdout.
 -C--O--!  whm_init_filename_type     whm_mem_utils.c
 -C--O--!  whm_free_filename_type     whm_mem_utils.c
-----O--!! whm_get_sheet		     whm_sheet.c	   Get and remove a sheet and config entry from the list to be written to disk.
+----O--!! whm_get_sheet		     whm_sheet.c	   Remove and return a sheet and config entry from the global list.
 ----O--#  whm_fill_option	     whm_main.c		   Fill a whm_option_type object with appropriate values.
 -C--O--## whm_clr_string	     whm_gen_utils.c	   Clean all values in the given queue.
+PC--O--/  whm_get_day_totals	     whm_sheet.c	   Calculate the totals of hours/earnings for each days of the month.
+PC--O--/  whm_get_week_totals	     whm_sheet.c	   Calculate the totals of hours/earnings for each weeks of the month.
+PC--O--/  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulative part.
+-C--O--/  whm_get_sheet_overtime     whm_sheet.c	   Look for and calculate the overtime for each week of a sheet.
+-C--O--/  whm_calculate_overtime     whm_sheet.c	   Calculate the overtime.
 
 *  Really no use in making a function for this, much more simple to add the value by hand.
 ** Still might create it later on, but at the moment I don't see a need for it.
@@ -153,3 +165,5 @@ PC-----	  whm_get_sheet_cumuls	     whm_sheet.c	   Calculate the sheet's cumulat
 !! Will manualy access the object and verify the index as needed.
 #  Added an extra step for no real reasons.
 ## The buffer gets cleared before each writes into it.
+/  Carefully rebuilding whm_update_sheet() is a much better solution, plus
+   it will make [hopefully] the program more readable.

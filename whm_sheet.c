@@ -16,6 +16,21 @@
 
 #include "whm.h"
 
+/*** Used by whm_queue_to_sheet() ***/
+static int total_hours_linenum;
+static int total_earnings_linenum;
+static int saved_week_ind;
+static int pos_with_overtime;
+enum whm_sheet_constant_type {
+  REG_HOURS = 2,
+  REG_EARNINGS,
+  TS_HOURS,
+  TS_EARNINGS
+};
+static enum whm_sheet_constant_type current_line_type;
+/***                              ***/
+
+
 /* Global list of sheet to be written to disk (whm_main.c). */
 extern whm_backup_T *to_write;
 
@@ -167,7 +182,9 @@ int whm_print_sheet_cal(FILE *stream,
   size_t week_ind = 0, day_ind = 0;
   int pos_ind = 0;
   int line_count = 0;
+  int have_done_overtime = 0;
   char temp[WHM_MAX_PATHNAME_S]; /* s_itoa() needs a temporary buffer. */
+  
   /* -18s: WHM_NAME_STR_S == 18. */
 
   if (!stream || !config
@@ -193,15 +210,21 @@ int whm_print_sheet_cal(FILE *stream,
     }
     fprintf(stream, "  Total Heures:    Total Gains:\n");
 
-    /* 
+    /*
      * The config->numof_positions*2 number of lines following the day's names and dates
      * goes like this:
-     * position1_name   position1_worked_hours
-     *                  position1_earnings
-     * position2_name   position2_worked_hours
-     *                  position2_earnings
-     * positionN_name   positionN_worked_hours
-     *                  positionN_earnings
+     * p1_name          p1_worked_hours
+     *                  p1_earnings
+     * p1_over_time     p1_ot_worked_hours
+     *                  p1_ot_earnings
+     * p2_name          p2_worked_hours
+     *                  p2_earnings
+     * p2_over_time     p2_ot_worked_hours
+     *                  p2_ot_earnings
+     * pN_name          pN_worked_hours
+     *                  pN_earnings
+     * pN_over_time     pN_ot_worked_hours
+     *                  pN_ot_earnings
      * ...
      */
 
@@ -209,52 +232,86 @@ int whm_print_sheet_cal(FILE *stream,
       fprintf(stream, "%-18s ", config->positions[pos_ind]);
       for (day_ind = 0; day_ind < 7; day_ind++){
 	fprintf(stream, "%5.5s      ",
-		((sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1)
+		((sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] <= 0)
 		 ? WHM_NO_HOUR
 		 : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind], WHM_NAME_STR_S)));
       }
       fprintf(stream, "  %6.6s",
-	      ((sheet->week[week_ind]->pos_total_hours[pos_ind] == -1)
+	      ((sheet->week[week_ind]->pos_total_hours[pos_ind] <= 0)
 	       ? WHM_NO_THOUR
 	       : s_ftoa(temp, sheet->week[week_ind]->pos_total_hours[pos_ind], WHM_NAME_STR_S)));
       fprintf(stream, "\n                   ");
       for (day_ind = 0; day_ind < 7; day_ind++){
 	fprintf(stream, "%6.6s$    ",
-		((sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] == -1)
+		((sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] <= 0)
 		 ? WHM_NO_CASH
 		 : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind], WHM_NAME_STR_S)));
       }
       fprintf(stream, "                   %8.8s$",
-	      ((sheet->week[week_ind]->pos_total_earnings[pos_ind] == -1) 
+	      ((sheet->week[week_ind]->pos_total_earnings[pos_ind] <= 0)
 	       ? WHM_NO_TCASH
 	       : s_ftoa(temp, sheet->week[week_ind]->pos_total_earnings[pos_ind], WHM_NAME_STR_S)));
-      
-    
       fprintf(stream, "\n");
-      
+      /* 
+       * Check if overtime was made for any day during the current week.
+       * If yes, for each days of the current week, do like above, but with the OT arrays.
+       */
+      for (day_ind = 0; day_ind < 7; day_ind++)
+	if (sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] > 0
+	    || sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] > 0) {
+	  have_done_overtime++;
+	  break;
+	}	  
+      if (have_done_overtime) {
+	fprintf(stream, "TS:                ");
+	for (day_ind = 0; day_ind < 7; day_ind++){
+	  fprintf(stream, "%5.5s      ",
+		  ((sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] <= 0)
+		   ? WHM_NO_HOUR
+		   : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind], WHM_NAME_STR_S)));
+	}
+	fprintf(stream, "  %6.6s",
+		((sheet->week[week_ind]->pos_ot_total_hours[pos_ind] <= 0)
+		 ? WHM_NO_THOUR
+		 : s_ftoa(temp, sheet->week[week_ind]->pos_ot_total_hours[pos_ind], WHM_NAME_STR_S)));
+	fprintf(stream, "\n                   ");
+
+	for (day_ind = 0; day_ind < 7; day_ind++){
+	  fprintf(stream, "%6.6s$    ",
+		  ((sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] <= 0)
+		   ? WHM_NO_CASH
+		   : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind], WHM_NAME_STR_S)));
+	}
+	fprintf(stream, "                   %8.8s$",
+		((sheet->week[week_ind]->pos_ot_total_earnings[pos_ind] <= 0)
+		 ? WHM_NO_TCASH
+		 : s_ftoa(temp, sheet->week[week_ind]->pos_ot_total_earnings[pos_ind], WHM_NAME_STR_S)));
+	fprintf(stream, "\n");
+      }
+      have_done_overtime = 0;
     }
     /* Daily totals goes here. */
     fprintf(stream, "Total Heures:      ");
     for (day_ind = 0; day_ind < 7; day_ind++){
       fprintf(stream, "%6.6s     ",
-	      ((sheet->week[week_ind]->day[day_ind]->total_hours == -1)
+	      ((sheet->week[week_ind]->day[day_ind]->total_hours <= 0)
 	       ? WHM_NO_THOUR
 	       : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->total_hours, WHM_NAME_STR_S)));
     }
     fprintf(stream, "  %6.6s\n",
-	    ((sheet->week[week_ind]->total_hours == -1)
+	    ((sheet->week[week_ind]->total_hours <= 0)
 	     ? WHM_NO_THOUR
 	     : s_ftoa(temp, sheet->week[week_ind]->total_hours, WHM_NAME_STR_S)));
 
     fprintf(stream, "Total Gains:       ");
     for (day_ind = 0; day_ind < 7; day_ind++){
       fprintf(stream, "%8.8s$  ",
-	      ((sheet->week[week_ind]->day[day_ind]->total_earnings == -1)
+	      ((sheet->week[week_ind]->day[day_ind]->total_earnings <= 0)
 	       ? WHM_NO_TCASH
 	       : s_ftoa(temp, sheet->week[week_ind]->day[day_ind]->total_earnings, WHM_NAME_STR_S)));
     }
     fprintf(stream, "                   %8.8s$\n",
-	    ((sheet->week[week_ind]->total_earnings == -1)
+	    ((sheet->week[week_ind]->total_earnings <= 0)
 	     ? WHM_NO_TCASH
 	     : s_ftoa(temp, sheet->week[week_ind]->total_earnings, WHM_NAME_STR_S)));
     
@@ -292,12 +349,12 @@ int whm_print_sheet_cumul(FILE *stream,
     else fprintf(stream, "\nGrand Total:       ");
     /* Print the total worked hours for all 'day_ind' day this month, all positions combined. */
     fprintf(stream, "%6.6s   ",
-	    ((sheet->day_total_hours[day_ind] == -1)
+	    ((sheet->day_total_hours[day_ind] <= 0)
 	     ? WHM_NO_THOUR
 	     : s_ftoa(temp, sheet->day_total_hours[day_ind], WHM_NAME_STR_S)));
     /* Print the total earned for all 'day_ind' day this month, all positions combined. */
     fprintf(stream, "%8.8s\n",
-	    ((sheet->day_total_earnings[day_ind] == -1)
+	    ((sheet->day_total_earnings[day_ind] <= 0)
 	     ? WHM_NO_TCASH
 	     : s_ftoa(temp, sheet->day_total_earnings[day_ind], WHM_NAME_STR_S)));
 
@@ -305,11 +362,11 @@ int whm_print_sheet_cumul(FILE *stream,
     for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++){
       fprintf(stream, "%-18s ", config->positions[pos_ind]);
       fprintf(stream, "%6.6s   ",
-	      ((sheet->day_pos_hours[day_ind][pos_ind] == -1)
+	      ((sheet->day_pos_hours[day_ind][pos_ind] <= 0)
 	       ? WHM_NO_THOUR
 	       : s_ftoa(temp, sheet->day_pos_hours[day_ind][pos_ind], WHM_NAME_STR_S)));
       fprintf(stream, "%8.8s\n",
-	      ((sheet->day_pos_earnings[day_ind][pos_ind] == -1)
+	      ((sheet->day_pos_earnings[day_ind][pos_ind] <= 0)
 	       ? WHM_NO_TCASH
 	       : s_ftoa(temp, sheet->day_pos_earnings[day_ind][pos_ind], WHM_NAME_STR_S)));
     }
@@ -439,6 +496,8 @@ int whm_queue_to_sheet(whm_config_T *config,
 		       int day_ind,
 		       int is_cal)
 {
+  int loc_line_type = 0;
+  
   if (!sheet || !config
       || !queue || line_count < 0
       || week_ind < 0 || pos_ind < 0
@@ -448,11 +507,22 @@ int whm_queue_to_sheet(whm_config_T *config,
   }
 
   if (is_cal){
+    /* saved_week_ind is -1 when it has been reseted by whm_parse_sheet(). */
+    if (saved_week_ind == -1) {
+      ;
+    }
+    /* Incremented by whm_parse_sheet() if needed. */
+    if (pos_with_overtime > 0){
+      total_hours_linenum = ((config->numof_positions*2)+(pos_with_overtime*2)+2);
+      total_earnings_linenum = ((config->numof_positions*2)+(pos_with_overtime*2)+3);
+      saved_week_ind = week_ind;
+    }
+
     /* 
      * Queue's content depends on the line number:
      * Line 0:                          the week number.
      * Line 1:                          the dates.
-     * Line 2 to (numof_positions*2)+1: hours/cash of each positions.
+     * Line 2 to (numof_positions*2)+1: hours/cash of each positions + overtime (optionally).
      * Line numof_positions*2+2:        total hours.
      * Line (numof_positions*2)+3:      total earnings.
 
@@ -466,29 +536,60 @@ int whm_queue_to_sheet(whm_config_T *config,
       for (day_ind = 0; day_ind < 7; day_ind++)
 	sheet->week[week_ind]->day[day_ind]->date = atoi(whm_get_string(queue));
     }
-    else if (line_count > 1 && line_count < (config->numof_positions*2)+2) {
-      /* 
-       * Cause of the way hour sheets are arranged, 
-       * hours are on even numbered lines, while
-       * earnings are on uneven numbered lines.
-       */
-      if (line_count % 2){
-	for (day_ind = 0; day_ind < 7; day_ind++)
-	  sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = atof(whm_get_string(queue));
-	sheet->week[week_ind]->pos_total_earnings[pos_ind] = atof(whm_get_string(queue));
+    else if (line_count > 1 && line_count < total_hours_linenum) {
+      /* If saved_week_ind isn't -1, it means we must take account the extra lines of overtime. */
+      if (saved_week_ind != -1){
+	loc_line_type = current_line_type * pos_with_overtime;
+	if (loc_line_type == REG_HOURS * pos_with_overtime){
+	  for (day_ind = 0; day_ind < 7; day_ind++)
+	    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(whm_get_string(queue));
+	  sheet->week[week_ind]->pos_total_hours[pos_ind] = atof(whm_get_string(queue));
+	}
+	else if (loc_line_type == REG_EARNINGS * pos_with_overtime) {
+	  for (day_ind = 0; day_ind < 7; day_ind++)
+	    sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = atof(whm_get_string(queue));
+	  sheet->week[week_ind]->pos_total_earnings[pos_ind] = atof(whm_get_string(queue));
+	}
+	else if (loc_line_type == TS_HOURS * pos_with_overtime) {
+	  for (day_ind = 0; day_ind < 7; day_ind++)
+	    sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] = atof(whm_get_string(queue));
+	  sheet->week[week_ind]->pos_ot_total_hours[pos_ind] = atof(whm_get_string(queue));
+	}
+	else if (loc_line_type == TS_EARNINGS * pos_with_overtime) {
+	  for (day_ind = 0; day_ind < 7; day_ind++)
+	    sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] = atof(whm_get_string(queue));
+	  sheet->week[week_ind]->pos_ot_total_earnings[pos_ind] = atof(whm_get_string(queue));
+	}
+	else {
+	  errno = WHM_INVALIDELEMCOUNT;
+	  return WHM_ERROR;
+	}
+	if (++current_line_type > TS_EARNINGS) current_line_type = REG_HOURS;
       }
-      else{
-	for (day_ind = 0; day_ind < 7; day_ind++)
-	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(whm_get_string(queue));
-	sheet->week[week_ind]->pos_total_hours[pos_ind] = atof(whm_get_string(queue));
+      else {
+	/* 
+	 * Cause of the way hour sheets are arranged, 
+	 * hours are on even numbered lines, while
+	 * earnings are on uneven numbered lines.
+	 */
+	if (line_count % 2){
+	  for (day_ind = 0; day_ind < 7; day_ind++)
+	    sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = atof(whm_get_string(queue));
+	  sheet->week[week_ind]->pos_total_earnings[pos_ind] = atof(whm_get_string(queue));
+	}
+	else{
+	  for (day_ind = 0; day_ind < 7; day_ind++)
+	    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(whm_get_string(queue));
+	  sheet->week[week_ind]->pos_total_hours[pos_ind] = atof(whm_get_string(queue));
+	}
       }
     }
-    else if (line_count == (config->numof_positions*2)+2){
+    else if (line_count == total_hours_linenum){
       for (day_ind = 0; day_ind < 7; day_ind++)
 	sheet->week[week_ind]->day[day_ind]->total_hours = atof(whm_get_string(queue));
       sheet->week[week_ind]->total_hours = atof(whm_get_string(queue));
     }
-    else if (line_count == (config->numof_positions*2)+3){
+    else if (line_count == total_earnings_linenum){
       for (day_ind = 0; day_ind < 7; day_ind++)
 	sheet->week[week_ind]->day[day_ind]->total_earnings = atof(whm_get_string(queue));
       sheet->week[week_ind]->total_earnings = atof(whm_get_string(queue));
@@ -541,9 +642,10 @@ int whm_parse_sheet(whm_config_T *config,
 {
   int    line_count = 0, is_cal = 0;
   int    day_ind  = 0, pos_ind = 0, week_ind = 0;
-  int    cont_ind = 0, temp_ind = 0;
+  int    cont_ind = 0, temp_ind = 0, ot_ind = 0;
   whm_queue_T *queue = NULL;
   char   temp[WHM_NAME_STR_S];
+  char   ot_string[WHM_NAME_STR_S];
 
   if (!sheet || !config  || !content){
     errno = EINVAL;
@@ -554,8 +656,16 @@ int whm_parse_sheet(whm_config_T *config,
     return WHM_ERROR;
   }
 
+  /* Because they're still uninitialized (static, declared after headers). */
+  saved_week_ind = -1;
+  pos_with_overtime = 0;
+  current_line_type = REG_HOURS;
+  total_hours_linenum = (config->numof_positions*2)+2;
+  total_earnings_linenum = (config->numof_positions*2)+3;
+
   /* To remove the 'use of uninitialized value' from valgrind. */
   memset(temp, '\0', WHM_NAME_STR_S);
+  memset(ot_string, '\0', WHM_NAME_STR_S);
   /* 
    * Only register the digits and dots characters. 
    * The only way to reach the bottom of the loop is 
@@ -629,14 +739,24 @@ int whm_parse_sheet(whm_config_T *config,
 	goto errjmp;
       }
       if ((line_count > 1)
-	  && (line_count < (config->numof_positions*2)+2)
-	  && (line_count % 2))
-	++pos_ind;
+	  && (line_count < total_hours_linenum))
+	if ((saved_week_ind != -1
+	     && pos_with_overtime > 0
+	     && current_line_type == REG_HOURS)
+	    || (line_count % 2))
+	  ++pos_ind;
       ++line_count;
+
       if (content[cont_ind] == NEWLINE){
 	++cont_ind;
 	/* Once week_ind is bigger than 6, it doesn't matter anymore. */
 	++week_ind;
+	/* Reset static variables now. */
+	total_hours_linenum = (config->numof_positions*2)+2;
+	total_earnings_linenum = (config->numof_positions*2)+3;
+	saved_week_ind = -1;
+	pos_with_overtime = 0;
+	current_line_type = REG_HOURS;
 	line_count = 0;
 	if (week_ind < 7 || day_ind > 7) day_ind = 0;
 	else ++day_ind;
@@ -657,6 +777,18 @@ int whm_parse_sheet(whm_config_T *config,
 	}
 	temp_ind = 0;
       }
+      if (ot_ind){
+	ot_string[ot_ind] = '\0';
+	if (s_strcmp(ot_string, "TS", 2, LS_ICASE) == 0){
+	  /* Since seeing a newline increments pos_ind but we aren't done with the previous position. */
+	  --pos_ind;	  
+	  current_line_type = TS_HOURS;
+	  ++pos_with_overtime;
+	}
+	memset(ot_string, '\0', WHM_NAME_STR_S);
+	ot_ind = 0;
+      }
+	
       continue;
     }
 
@@ -675,9 +807,11 @@ int whm_parse_sheet(whm_config_T *config,
       temp_ind = strlen(temp)+1;
       continue;
     }
+    if (isalpha(content[cont_ind]))
+      ot_string[ot_ind++] = content[cont_ind];
     
     /* Save the dot or digit character into temp[temp_ind]. Skip anything else. */
-    if (isdigit(content[cont_ind]) ||  content[cont_ind] == DOT)
+    else if (isdigit(content[cont_ind]) ||  content[cont_ind] == DOT)
       temp[temp_ind++] = content[cont_ind];
 
     /* Next character. */
@@ -710,39 +844,290 @@ int whm_parse_sheet(whm_config_T *config,
  * Depending on whether it gets paid or not the 4% is also recalculated.
  */
 int whm_update_sheet(whm_config_T *config,
-		     whm_sheet_T *sheet)
+		     whm_sheet_T *sheet,
+		     whm_time_T *time_o)
 {
-  int day_ind = 0, week_ind = 0, pos_ind = 0;
-
-  if (!config || !sheet){
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+  int ot_limit = 40;
+  int wage = 0;
+  
+  if (!config || !sheet) {
     errno = EINVAL;
     return WHM_ERROR;
   }
 
-  /* 
-   * For each date that's not -1,
-   * make sure one of 'hours' or 'earnings' isn't -1 (prioritizing hours).
-   * Calculate (always make sure values aren't -1 before using them): 
-   *  - The money made that day for each positions 
-   *    OR
-   *    The hours made that day for each positions
-   *  - Add each positions' hours and earnings to their respective total of the current date.
-   *  - The current total of hours/earnings + optionaly the 4% of all positions combined.
-   *  - The current total of hours/earnings of each separate positions.
-   * When each days of the sheet has been recalculated
-   *  - The total hours/earning per week day, all positions combined.
-   *  - The total hours/earning per week day, per position.
-   *  - The grand total hours/earnings for this month, all combined.
-   *  - The grand total hours/earnings for this months, per positions.
-   */
   whm_reset_totals(sheet, config);
-  whm_get_day_totals(sheet, config);
-  whm_get_week_totals(sheet, config);
-  whm_get_sheet_cumuls(sheet, config);
+  whm_reset_overtime(sheet, config);
+  if (sheet->week[0]->day[0]->total_hours == -1)
+    if (whm_complete_week(sheet, config, time_o) == WHM_ERROR){
+      WHM_ERRMESG("Whm_complete_week");
+      return WHM_ERROR;
+    }
+
+  for (; week_ind < 6; week_ind++) {
+    int overtime_reached = 0; /* 1 when overtime starts being calculated. */
+    for (day_ind = 0; day_ind < 7; day_ind++) {
+      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
+	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1) continue;
+	sheet->week[week_ind]->total_hours +=
+	  ((sheet->week[week_ind]->total_hours == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] +1
+	   : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
+	sheet->week[week_ind]->day[day_ind]->total_hours +=
+	  ((sheet->week[week_ind]->day[day_ind]->total_hours == -1)
+	   ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] +1
+	   : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
+
+	/* If it's a night shift, add the night prime now if there's one. */
+
+	/* When making overtime. */
+	if (sheet->week[week_ind]->total_hours >= ot_limit) {
+	  if (!overtime_reached) {
+	    ++overtime_reached;
+	    sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] =
+	      sheet->week[week_ind]->total_hours - ot_limit;
+	    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] -=
+	      sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];	    
+	  }
+	  else {
+	    sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] =
+	      sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+	    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = -1;
+	    sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = -1;
+	  }
+	  if (sheet->week[week_ind]->total_hours >= 50
+	      && config->double_time_after_50) wage = config->wages[pos_ind] * 2;
+	  else if (config->time_n_half_after_40) wage = config->wages[pos_ind] + (config->wages[pos_ind]/2);
+	  else wage = config->wages[pos_ind];
+	  sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] =
+	    sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] * wage;
+	  sheet->week[week_ind]->day[day_ind]->total_earnings +=
+	    (sheet->week[week_ind]->day[day_ind]->total_earnings == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	  sheet->week[week_ind]->total_earnings +=
+	    (sheet->week[week_ind]->total_earnings == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	  sheet->week[week_ind]->pos_ot_total_earnings[pos_ind] +=
+	    (sheet->week[week_ind]->pos_ot_total_earnings[pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] +1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	  sheet->week[week_ind]->pos_ot_total_hours[pos_ind] +=
+	    (sheet->week[week_ind]->pos_ot_total_hours[pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] + 1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+	  /* To be replaced by overtime cumulatives. */
+	  sheet->day_total_hours[day_ind] +=
+	    (sheet->day_total_hours[day_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+	  sheet->day_total_earnings[day_ind] +=
+	    (sheet->day_total_earnings[day_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	  sheet->day_pos_hours[day_ind][pos_ind] +=
+	    (sheet->day_pos_hours[day_ind][pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+	  sheet->day_pos_earnings[day_ind][pos_ind] +=
+	    (sheet->day_pos_earnings[day_ind][pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	  sheet->day_total_hours[7] +=
+	    (sheet->day_total_hours[7] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+	  sheet->day_total_earnings[7] +=
+	    (sheet->day_total_earnings[7] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	  sheet->day_pos_hours[7][pos_ind] +=
+	    (sheet->day_pos_hours[7][pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+	  sheet->day_pos_earnings[7][pos_ind] +=
+	    (sheet->day_pos_earnings[7][pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind]+1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind];
+	}
+	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] < 0) continue;
+	wage = config->wages[pos_ind];
+	sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] =
+	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] * wage;
+	sheet->week[week_ind]->day[day_ind]->total_earnings +=
+	  (sheet->week[week_ind]->day[day_ind]->total_earnings == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+	sheet->week[week_ind]->total_earnings +=
+	  (sheet->week[week_ind]->total_earnings == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+	sheet->week[week_ind]->pos_total_earnings[pos_ind] +=
+	  (sheet->week[week_ind]->pos_total_earnings[pos_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+	sheet->week[week_ind]->pos_total_hours[pos_ind] +=
+	  (sheet->week[week_ind]->pos_total_hours[pos_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+	/* Cumulatives */
+	sheet->day_total_hours[day_ind] +=
+	  (sheet->day_total_hours[day_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+	sheet->day_total_earnings[day_ind] +=
+	  (sheet->day_total_earnings[day_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+	sheet->day_pos_hours[day_ind][pos_ind] +=
+	  (sheet->day_pos_hours[day_ind][pos_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+	sheet->day_pos_earnings[day_ind][pos_ind] +=
+	  (sheet->day_pos_earnings[day_ind][pos_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+	sheet->day_total_hours[7] +=
+	  (sheet->day_total_hours[7] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+	sheet->day_total_earnings[7] +=
+	  (sheet->day_total_earnings[7] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+	sheet->day_pos_hours[7][pos_ind] +=
+	  (sheet->day_pos_hours[7][pos_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+	sheet->day_pos_earnings[7][pos_ind] +=
+	  (sheet->day_pos_earnings[7][pos_ind] == -1)
+	  ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
+	  : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind];
+      }
+    }
+    if (config->do_pay_holiday && sheet->week[week_ind]->total_earnings > -1)
+      sheet->week[week_ind]->total_earnings +=
+	(sheet->week[week_ind]->total_earnings * 4)/100;
+    
+  }
 
   return 0;
 
 } /* whm_update_sheet() */
+
+/* 
+ * Changes any number of overtime hours to regular hours
+ * and sets the overtime fields to -1.
+ */
+void whm_reset_overtime(whm_sheet_T *sheet,
+			whm_config_T *config)
+{
+  int week_ind = 0, day_ind = 0, pos_ind = 0;
+  for(; week_ind < 6; week_ind++)
+    for (day_ind = 0; day_ind < 7; day_ind++)
+      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++)
+	if (sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] != -1){
+	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] +=
+	    (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1)
+	    ? sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] + 1
+	    : sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+	  sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] = -1;
+	}
+
+} /* whm_reset_overtime() */
+
+
+/* 
+ * When encountering a month wich begin by an incomplete week,
+ * (the first of the month is not on a sunday) this function
+ * returns the number of hours of the last [incomplete] week
+ * of the previous month, or 0 if it hasn't been created yet.
+ */
+int whm_complete_week(whm_sheet_T *sheet,
+		      whm_config_T *config,
+		      whm_time_T *time_o)
+{
+  whm_time_T *loc_time_o = NULL;
+  whm_sheet_T *prev_month = NULL;
+  int month_ind = 0, week_ind = 5;
+  char prev_month_path[WHM_MAX_PATHNAME_S];
+  char temp[WHM_TIME_STR_S];
+  
+  if (!sheet || !config || !time_o) {
+    errno = EINVAL;
+    return WHM_ERROR;
+  }
+
+  if ((loc_time_o = whm_init_time_type()) == NULL) {
+    WHM_ERRMESG("Whm_init_type_type");
+    return WHM_ERROR;
+  }
+  if ((prev_month = whm_init_sheet_type()) == NULL) {
+    WHM_ERRMESG("Whm_init_sheet_type");
+    goto errjmp;
+  }
+
+  if (whm_copy_time((sheet->time_o) ? sheet->time_o : loc_time_o,
+		    time_o) == NULL){
+    WHM_ERRMESG("Whm_copy_time");
+    goto errjmp;
+  }
+  for (month_ind = 0; month_ind < 12; month_ind++)
+    if (s_strcmp(loc_time_o->month, WHM_EN_MONTHS[month_ind], WHM_TIME_STR_S, 0) == 0
+	|| atoi(loc_time_o->month) == month_ind+1) break;
+  if (month_ind > 11) {
+    errno = WHM_INVALIDMONTH;
+    goto errjmp;
+  }
+  if (month_ind-1 < 0) month_ind = 11;
+  if (s_strcpy(loc_time_o->month, s_itoa(temp, month_ind, WHM_TIME_STR_S), WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    goto errjmp;
+  }
+
+  memset(prev_month_path, '\0', WHM_MAX_PATHNAME_S);
+  if (whm_make_sheet_path(prev_month_path, loc_time_o, config) == NULL){
+    WHM_ERRMESG("Whm_make_sheet_path");
+    goto errjmp;
+  }
+  if (whm_read_sheet(prev_month_path, config, time_o, prev_month) == WHM_ERROR){
+    if (errno == ENOENT) goto success;
+    else {
+      WHM_ERRMESG("Whm_read_sheet");
+      goto errjmp;
+    }
+  }
+  for (; week_ind >= 0; week_ind--)
+    if ((sheet->week[0]->total_hours = prev_month->week[week_ind]->total_hours) != -1) break;
+  if (week_ind < 0) week_ind = 0;
+  sheet->week[0]->total_earnings = prev_month->week[week_ind]->total_earnings;
+
+ success:
+  if (loc_time_o) {
+    whm_free_time_type(loc_time_o);
+    loc_time_o = NULL;
+  }
+  if (prev_month) {
+    whm_free_sheet_type(prev_month);
+    prev_month = NULL;
+  }
+  return 0;
+  
+ errjmp:
+  if (loc_time_o) {
+    whm_free_time_type(loc_time_o);
+    loc_time_o = NULL;
+  }
+  if (prev_month) {
+    whm_free_sheet_type(prev_month);
+    prev_month = NULL;
+  }
+  return WHM_ERROR;
+
+
+} /* whm_complete_week() */
+    
 
 
 void whm_reset_totals(whm_sheet_T *sheet,
@@ -762,6 +1147,8 @@ void whm_reset_totals(whm_sheet_T *sheet,
 	sheet->day_pos_earnings[day_ind][pos_ind] = -1.0;
 	sheet->week[week_ind]->pos_total_hours[pos_ind] = -1.0;
 	sheet->week[week_ind]->pos_total_earnings[pos_ind] = -1.0;
+	sheet->week[week_ind]->pos_ot_total_hours[pos_ind] = -1.0;
+	sheet->week[week_ind]->pos_ot_total_earnings[pos_ind] = -1.0;
       }
     }
   }
@@ -775,173 +1162,194 @@ void whm_reset_totals(whm_sheet_T *sheet,
 
 
 /* 
- * No error checks are made on the arguments.
- * Calculate the totals of hours and earnings for each days of a given sheet.
+ * Gives the number of positions worked in a single given day for a company.
+ * Returns 0 when no positions we're worked for the given day.
+ * Returns -x when only 1 position has been worked, where x is the negated pos_ind.
+ * Returns +x when more than 1 positions were worked, where x is the number of positions worked.
  */
-void whm_get_day_totals(whm_sheet_T *sheet,
-			whm_config_T *config)
+int whm_get_numof_pos_worked(whm_sheet_T *sheet,
+			     whm_config_T *config,
+			     int week_ind, int day_ind)
+{
+  int pos_ind = 0, saved_pos_ind = 0, numof_pos_worked = 0;
+  for(; pos_ind < config->numof_positions; pos_ind++)
+    if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] > -1) {
+      ++numof_pos_worked;
+      saved_pos_ind = pos_ind;
+    }
+
+  if (numof_pos_worked > 1) return numof_pos_worked;
+  else if (numof_pos_worked == 1) return -saved_pos_ind;
+  return 0;
+
+} /* whm_get_numof_pos_worked() */
+
+
+/* Calculates the overtime hours and earnings and adjust the week data consequently. */
+int whm_calculate_overtime(whm_sheet_T *sheet,
+			   whm_config_T *config,
+			   int ot_type,
+			   int week_ind,
+			   int last_worked_day)
+{
+  double wage = 0, diff_from_threshold = 0;
+  int ot_threshold = -1;
+  int ret = 0, pos_ind = 0, day_ind = last_worked_day;
+
+  /* 
+   * Verify that the overtime isn't split between multiple
+   * positions for the last worked day.
+   */
+  errno = 0;
+  if ((ret = whm_get_numof_pos_worked(sheet, config, week_ind, last_worked_day)) > 0)
+    ; /* Interactively ask user which positions the overtime goes to. */
+
+  else if (ret == 0 && errno) {
+    errno = WHM_INVALIDDAY;
+    return WHM_ERROR;
+  }
+
+  /* 
+   * ret is negative, only one position was worked for the given day
+   * meaning ret's absolute value is the pos_ind of the worked position. 
+   */
+  pos_ind = (ret == 0) ? ret : abs(ret);
+  switch (ot_type){
+  case OT_TIME_N_HALF:
+    wage = (config->wages[pos_ind]/2)+config->wages[pos_ind];
+    ot_threshold = 40;
+    break;
+  case OT_DOUBLE_TIME:
+    wage = config->wages[pos_ind]*2;
+    ot_threshold = 50;
+    break;
+  default:
+    errno = WHM_INVALIDOT;
+    return WHM_ERROR;
+  }
+  /* 
+   * Calculate the difference between the total hours of the week
+   * and the overtime threshold and substract it from one or more shifts
+   * until we reach the threshold.
+   */
+  diff_from_threshold = sheet->week[week_ind]->total_hours - ot_threshold;
+
+  while (diff_from_threshold > sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]) {
+    sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] =
+      sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind];
+    sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] =
+      sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] * wage;
+    diff_from_threshold -= sheet->week[week_ind]->day[day_ind]->total_hours;
+    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = 0;
+    sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] = 0;
+    /* Get the last worked day from the current day index. */
+    if ((day_ind = whm_last_worked_day(sheet, config, week_ind, day_ind)) == WHM_ERROR){
+      WHM_ERRMESG("Whm_last_worked_day");
+      return WHM_ERROR;
+    }
+  }
+  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] -= diff_from_threshold;
+  sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] =
+    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] * config->wages[pos_ind];
+  sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] +=
+    (sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind] == -1)
+    ? diff_from_threshold + 1
+    : diff_from_threshold;
+  sheet->week[week_ind]->day[day_ind]->pos_ot_earnings[pos_ind] =
+    sheet->week[week_ind]->day[day_ind]->pos_ot_hours[pos_ind];
+  
+  return 0;
+
+} /* whm_calculate_overtime() */
+
+
+/*
+ * When day_ind is bigger or equal to 0, starts at day_ind,
+ * else starts at the last weekday (saturday, index 6) and
+ * returns the last worked day for the given week.
+ */
+int whm_last_worked_day(whm_sheet_T *sheet,
+			whm_config_T *config,
+			int week_ind,
+			int day_ind)
+{
+  int loc_day_ind = 0;
+  int pos_ind = 0;
+
+  if (week_ind < 0 || week_ind > 6){
+    errno = WHM_INVALIDMONTH;
+    return WHM_ERROR;
+  }
+  if (day_ind > 6 || day_ind < 0) loc_day_ind = 6;
+  else if (day_ind > 1) loc_day_ind = day_ind-1;
+  else loc_day_ind = 0;
+  for (; loc_day_ind >= 0; loc_day_ind--){
+    if (sheet->week[week_ind]->day[loc_day_ind]->total_hours > 0)
+      return loc_day_ind;
+    for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++)
+      if (sheet->week[week_ind]->day[loc_day_ind]->pos_ot_hours[pos_ind] > 0)
+	return loc_day_ind;
+  }
+
+  return WHM_ERROR;
+  
+} /* whm_last_worked_day() */
+
+/*
+ * Look for and calculate the overtime made for each days
+ * of each weeks of the given hour sheet.
+ */
+void whm_get_sheet_overtime(whm_sheet_T *sheet,
+			    whm_config_T *config)
 {
   int week_ind = 0, day_ind = 0, pos_ind = 0;
-
+  double diff_from_50 = 0, diff_from_40 = 0;
+  int numof_pos_worked = 0;
+  int saved_pos_ind = -1, saved_day_ind = 0;
+  /* 
+   * Verify that the overtime gets paid or else return now.
+   * If it does, check if the wage gets doubled after 50.
+   * If it does, calculate the numbers of hours at double time there are,
+   * substract them from the position's total of [regular] hours and from the position's
+   * daily total of [regular] hours then add them
+   * to the total of overtime worked for this position for the current day.
+   * Make sure that the number of overtime hours is smaller than the number
+   * of hours worked during the current day, else continue the same process
+   * on the last worked day(s).
+   * From either the new weekly total or the original, which are now both less than 50 hours,
+   * calculate the number of time and a half hours worked. Repeat the same process 
+   * as above (put it into a function).
+   *
+   * When for a single day 2+ positions were worked and the overtime limit is being reached
+   * but does not cover the whole work day, ask the user the
+   * number of overtime hours worked for each positions.
+   */
+  if (!config->time_n_half_after_40) return;
+  /* For each weeks, check if overtime was made. */
   for (; week_ind < 6; week_ind++) {
-
-    for (day_ind = 0; day_ind < 7; day_ind++) {
-      /* Remember -1 is always the default value since 0 is perfectly valid. */      
-      if (sheet->week[week_ind]->day[day_ind]->date == -1) continue;
-
-      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
-	/* First, check if we either got hours or an amount of money to play with. */
-	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1
-	    && sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] == -1) continue;
-	/* 
-	 * Always prioritize hours but if there's only an amount
-	 * of money present, calculate the number of hours worked from it. 
-	 */
-	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] > -1)
-	  sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] =
-	    sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] * config->wages[pos_ind];
-	else if (sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] > 0)
-	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] =
-	    sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] / config->wages[pos_ind];
-	else
-	  sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = 0;
-
-	/* Update the daily totals. */
-	sheet->week[week_ind]->day[day_ind]->total_hours +=
-	  ((sheet->week[week_ind]->day[day_ind]->total_hours == -1)
-	   ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] + 1
-	   : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
-	sheet->week[week_ind]->day[day_ind]->total_earnings +=
-	  ((sheet->week[week_ind]->day[day_ind]->total_earnings == -1)
-	   ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] + 1
-	   : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]);
+    if (sheet->week[week_ind]->total_hours >= 40){
+      if ((day_ind = whm_last_worked_day(sheet, config, week_ind, -1)) == WHM_ERROR){
+	WHM_ERRMESG("Whm_last_worked_day");
+	return;
+      }
+      /* If more than 50 hours were made, check if wage gets doubled. */      
+      if (config->double_time_after_50 && sheet->week[week_ind]->total_hours >= 50){
+	if (whm_calculate_overtime(sheet, config, OT_DOUBLE_TIME,
+				   week_ind, day_ind) != 0){
+	  WHM_ERRMESG("Whm_calculate_overtime");
+	  return;
+	}
+      }
+      if (whm_calculate_overtime(sheet, config, OT_TIME_N_HALF,
+				 week_ind, day_ind) != 0){
+	WHM_ERRMESG("Whm_calculate_overtime");
+	return;
       }
     }
   }
       
-} /* whm_get_day_totals() */
-
-
-/*
- * No error checks are made on the arguments.
- * Calculate the amount of hours/earnings for each 
- * weeks of an hour sheet. 
- */
-void whm_get_week_totals(whm_sheet_T *sheet,
-			 whm_config_T *config)
-{
-  int week_ind = 0, day_ind = 0, pos_ind = 0;
-
-  for (; week_ind < 6; week_ind++) {
-    for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
-      for (day_ind = 0; day_ind < 7; day_ind++) {
-	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1
-	    || sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] == -1) continue;
-
-	sheet->week[week_ind]->pos_total_hours[pos_ind] +=
-	  ((sheet->week[week_ind]->pos_total_hours[pos_ind] == -1)
-	   ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
-	   : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
-	sheet->week[week_ind]->pos_total_earnings[pos_ind] +=
-	  ((sheet->week[week_ind]->pos_total_earnings[pos_ind] == -1)
-	   ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
-	   : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]);
-      }
-
-      if (sheet->week[week_ind]->pos_total_hours[pos_ind] != -1
-	  && sheet->week[week_ind]->pos_total_earnings[pos_ind] != -1){
-	sheet->week[week_ind]->total_hours +=
-	  ((sheet->week[week_ind]->total_hours == -1)
-	   ? sheet->week[week_ind]->pos_total_hours[pos_ind]+1
-	   : sheet->week[week_ind]->pos_total_hours[pos_ind]);
-	sheet->week[week_ind]->total_earnings +=
-	  ((sheet->week[week_ind]->total_earnings == -1)
-	   ? sheet->week[week_ind]->pos_total_earnings[pos_ind]+1
-	   : sheet->week[week_ind]->pos_total_earnings[pos_ind]);
-      }
-
-    }
-    if (config->do_pay_holiday) sheet->week[week_ind]->total_earnings +=
-				  ((sheet->week[week_ind]->total_earnings * 4)/100);
-  }
-} /* whm_get_week_totals() */
-
-
-/*
- * No error checks are made on the arguments.
- * Calculate the cumulatives per week day and per position for
- * the current month. 
- */
-void whm_get_sheet_cumuls(whm_sheet_T *sheet,
-			  whm_config_T *config)
-{
-  int week_ind = 0, day_ind = 0, pos_ind = 0;
-
-  for (; day_ind < 7; day_ind++) {
-    for (week_ind = 0; week_ind < 6; week_ind++) {
-      for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
-	if (sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind] != -1
-	    && sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind] != -1) {
-	  sheet->day_pos_hours[day_ind][pos_ind] +=
-	    ((sheet->day_pos_hours[day_ind][pos_ind] == -1)
-	     ? sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]+1
-	     : sheet->week[week_ind]->day[day_ind]->pos_hours[pos_ind]);
-	  sheet->day_pos_earnings[day_ind][pos_ind] +=
-	    ((sheet->day_pos_earnings[day_ind][pos_ind] == -1)
-	     ? sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]+1
-	     : sheet->week[week_ind]->day[day_ind]->pos_earnings[pos_ind]);
-	}
-      }
-      if (sheet->week[week_ind]->day[day_ind]->total_hours != -1
-	  && sheet->week[week_ind]->day[day_ind]->total_earnings != -1){
-	sheet->day_total_hours[day_ind] +=
-	  ((sheet->day_total_hours[day_ind] == -1)
-	   ? sheet->week[week_ind]->day[day_ind]->total_hours+1
-	   : sheet->week[week_ind]->day[day_ind]->total_hours);
-	sheet->day_total_earnings[day_ind] +=
-	  ((sheet->day_total_earnings[day_ind] == -1)
-	   ? sheet->week[week_ind]->day[day_ind]->total_earnings+1
-	   : sheet->week[week_ind]->day[day_ind]->total_earnings);
-      }
-    }
-  }
-  /* Index 7 is the grand totals for this month. */
-  for (week_ind = 0; week_ind < 6; week_ind++) {
-    for (pos_ind = 0; pos_ind < config->numof_positions; pos_ind++) {
-
-      if (sheet->week[week_ind]->pos_total_hours[pos_ind] != -1
-	  && sheet->week[week_ind]->pos_total_earnings[pos_ind] != -1) {
-
-	sheet->day_pos_hours[7][pos_ind] +=
-	  ((sheet->day_pos_hours[7][pos_ind] == -1)
-	   ? sheet->week[week_ind]->pos_total_hours[pos_ind]+1
-	   : sheet->week[week_ind]->pos_total_hours[pos_ind]);
-
-	sheet->day_pos_earnings[7][pos_ind] +=
-	  ((sheet->day_pos_earnings[7][pos_ind] == -1)
-	   ? sheet->week[week_ind]->pos_total_earnings[pos_ind]+1
-	   : sheet->week[week_ind]->pos_total_earnings[pos_ind]);
-      }
-    }
-    if (sheet->week[week_ind]->total_hours != -1
-	&& sheet->week[week_ind]->total_earnings != -1) {
-      sheet->day_total_hours[7] +=
-	((sheet->day_total_hours[7] == -1)
-	 ? sheet->week[week_ind]->total_hours+1
-	 : sheet->week[week_ind]->total_hours);
-      sheet->day_total_earnings[7] +=
-	((sheet->day_total_earnings[7] == -1)
-	 ? sheet->week[week_ind]->total_earnings+1
-	 : sheet->week[week_ind]->total_earnings);
-    }
-  }
-
-} /* whm_get_sheet_cumuls() */
-
-
-
-
-
+  
+} /* whm_get_sheet_overtime() */
 
 
 /*
@@ -1002,7 +1410,7 @@ int whm_inter_update_sheet(whm_config_T **configs,
      * hours have already been wrote down.
      */
     for (pos_ind = 0; pos_ind < configs[c_ind]->numof_positions; pos_ind++)
-      if (sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] == -1) {
+      if (sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] <= 0) {
 	if (whm_ask_user(SHEET_WORKED_HOURS,
 			 answer, WHM_NAME_STR_S,
 			 configs[c_ind], pos_ind) != 0){
@@ -1013,7 +1421,7 @@ int whm_inter_update_sheet(whm_config_T **configs,
 	sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = atof(answer);
       }
     /* Update the sheet. */
-    if (whm_update_sheet(configs[c_ind], sheets[c_ind]) != 0){
+    if (whm_update_sheet(configs[c_ind], sheets[c_ind], time_o) != 0){
       WHM_ERRMESG("Whm_update_sheet");
       return WHM_ERROR;
     }
@@ -1155,12 +1563,13 @@ int whm_set_sheet(whm_config_T *config,
 
 
 /* Write to disk every hour sheet contained in the global to_write object. */
-int whm_write_sheet_list(whm_time_T *time_o)
+int whm_write_sheet_list(whm_time_T *time_object)
 {
   int i = 0;
   FILE *stream = NULL;
+  whm_time_T *time_o = NULL;
 
-  if (!time_o) {
+  if (!time_object) {
     errno = EINVAL;
     return WHM_ERROR;
   }
@@ -1176,6 +1585,12 @@ int whm_write_sheet_list(whm_time_T *time_o)
 	goto errjmp;
       }
     }
+    /* 
+     * If the ->time_o field of the current sheet isn't NULL use it,
+     * else use the time object passed by the caller. 
+     */
+    if (to_write->sheets[i]->time_o == NULL) time_o = time_object;
+    else time_o = to_write->sheets[i]->time_o;
     if ((stream = fopen(to_write->sheets[i]->path, "w")) == NULL) {
       WHM_ERRMESG("Fopen");
       return WHM_ERROR;
@@ -1224,3 +1639,9 @@ void whm_clean_sheet_list(void)
   to_write->c_ind = 0;
 
 } /* whm_clean_sheet_list() */
+
+
+/* 
+ * Print a summary of the worked hours and earning made for a given
+ * company name for a given period of time (weekly/monthly/yearly).
+ */

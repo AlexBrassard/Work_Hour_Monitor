@@ -43,7 +43,9 @@ typedef enum whm_errcodes_type {
   WHM_INVALIDVALUE,
   WHM_INVALIDMONTH,
   WHM_COMMENTTOOLONG,
-  WHM_INVALIDYEAR
+  WHM_INVALIDYEAR,
+  WHM_INVALIDOT,
+  WHM_INVALIDDAY
  
 } whm_errcodes_T;
 
@@ -73,9 +75,11 @@ static const char whm_errmesg[][WHM_ERRMESG_MAX_LENGHT] = {
   "Invalid argument name passed to command line option",
   "Command line option argument value is invalid or not present",
   "Invalid value passed to structure",
-  "Invalid month name",
+  "Invalid month name or index",
   "Cannot register the commentary; commentary is too long",
-  "Invalid year number: Year must be smaller or equal to the current year"
+  "Invalid year number: Year must be smaller or equal to the current year",
+  "Invalid overtime type",
+  "Invalid day name or index"
   
 };
 

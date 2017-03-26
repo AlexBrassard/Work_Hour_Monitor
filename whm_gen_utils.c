@@ -149,6 +149,39 @@ int whm_clr_time(whm_time_T *time_o)
 } /* whm_clr_time() */
 
 
+/* Copy src time object into dest time object. */
+whm_time_T* whm_copy_time(whm_time_T *dest, whm_time_T *src)
+{
+  if (!src || !dest) {
+    errno = EINVAL;
+    return NULL;
+  }
+
+  if (s_strcpy(dest->day, src->day, WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return NULL;
+  }
+  if (s_strcpy(dest->date, src->date, WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return NULL;
+  }
+  if (s_strcpy(dest->week, src->week, WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return NULL;
+  }
+  if (s_strcpy(dest->month, src->month, WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return NULL;
+  }
+  if (s_strcpy(dest->year, src->year, WHM_TIME_STR_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return NULL;
+  }
+  return dest;
+
+} /* whm_copy_time() */
+
+
 /* 
  * Adjust the given time object given a new time string
  * of the form dd-mm-yyyy .
@@ -283,12 +316,29 @@ int whm_adjust_time(char *time_str,
     }
   }
   else if (month == current_month) {
-    while (current_day != day) {
-      if (++day_ind > 6) {
-	day_ind = 0;
-	if (++week_num > 53) week_num = 0;
+    if (day < current_day) {
+      while (current_day != day) {
+	if (--day_ind < 0){
+	  day_ind = 6;
+	  if (--week_num < 1) {
+	    week_num = 53;
+	    --current_year;
+	  }
+	}
+	--current_day;
       }
-      if (++current_day > 31) current_day = 1;
+    }
+    else {
+      while (current_day != day){
+	if (++day_ind > 6) {
+	  day_ind = 0;
+	  if (++week_num > 53) {
+	    week_num = 1;
+	    ++current_year;
+	  }
+	}
+	++current_day;
+      }
     }
   }
   else {
@@ -590,6 +640,13 @@ int whm_ask_user(enum whm_question_type question,
     printf("\nVoulez-vous ajouter une autre compagnie? [Oui/Non]: ");
     break;
 
+  case TIME_N_HALF:
+    printf("\nRecevez-vous un bonus apres 40 heures (temps et demi)? [Oui/Non]: ");
+    break;
+
+  case DOUBLE_TIME:
+    printf("\nRecevez-vous un bonus apres 50 heures (temps double)? [Oui/Non]: ");
+    break;
     /* Configuration file entry modification. */
   case MODIF_COMPANY_NAME:
     printf("\nEntrez le nom de la compagnie a modifier.\n[Entrer \"list\" pour une liste d'entrees disponible]: ");
@@ -655,6 +712,14 @@ int whm_ask_user(enum whm_question_type question,
     printf("Entrez la date a modifier (jj-mm-aaaa): ");
     break;
 
+  case MENU_YEAR:
+    printf("Entrez l'annee (aaaa): ");
+    break;
+
+  case MENU_MONTH:
+    printf("Entrez le mois (1-12): ");
+    break;
+    
   default:
     errno = WHM_BADQUESTION;
     goto errjmp;
@@ -687,6 +752,40 @@ int whm_ask_user(enum whm_question_type question,
 #endif
 } /* whm_ask_user() */
 
+/* Makes a pathname for the given year's directory. */
+char* whm_make_year_path(whm_config_T *config,
+			 whm_time_T *time_o,
+			 char *path)
+{
+  if (!config || !time_o || !path) {
+    errno = EINVAL;
+    return NULL;
+  } 
+
+  /* 
+   * The directory path is always:
+   * /program's working directory/Company_name.d/year\0
+   * +5:                         ^            ^^^     ^
+   */
+  if ((strlen(WHM_WORKING_DIRECTORY) + strlen(config->employer)
+       + strlen(time_o->year) + 5) > WHM_MAX_PATHNAME_S) {
+    errno = EOVERFLOW;
+    return NULL;
+  }
+  if (s_strcpy(path, (char*)WHM_WORKING_DIRECTORY, WHM_MAX_PATHNAME_S) == NULL){
+    WHM_ERRMESG("S_strcpy");
+    return NULL;
+  }
+  strcat(path, "/");
+  strcat(path, config->employer);
+  strcat(path, ".d");
+  strcat(path, "/");
+  strcat(path, time_o->year);
+
+  return path;
+
+} /* whm_make_year_path() */
+
 
 /*                                                                                                                                    
  * Verify or create a year directory for a given company name.                                                                        
@@ -698,31 +797,28 @@ int whm_new_year_dir(whm_config_T *config,
 {
   FILE *stream = NULL;
   char path[WHM_MAX_PATHNAME_S];
-  
-  if (!config || !time_o) {
+
+  if (!config || !time_o){
     errno = EINVAL;
     return WHM_ERROR;
-  } 
-
-  /* 
-   * The directory path is always:
-   * /program's working directory/Company_name.d/year\0
-   * +5:                         ^            ^^^     ^
-   */
-  if ((strlen(WHM_WORKING_DIRECTORY) + strlen(config->employer)
-       + strlen(time_o->year) + 5) > WHM_MAX_PATHNAME_S) {
-    errno = EOVERFLOW;
+  }
+  
+  if ((stream = fopen(config->working_directory, "r")) == NULL){
+    if (whm_new_dir(config->working_directory) != 0){
+      WHM_ERRMESG("Whm_new_dir");
+      return WHM_ERROR;
+    }
+  }
+  else {
+    fclose(stream);
+    stream = NULL;
+  }
+  
+  memset(path, '\0', WHM_MAX_PATHNAME_S);
+  if (whm_make_year_path(config, time_o, path) == NULL){
+    WHM_ERRMESG("Whm_make_year_path");
     return WHM_ERROR;
   }
-  if (s_strcpy(path, (char*)WHM_WORKING_DIRECTORY, WHM_MAX_PATHNAME_S) == NULL){
-    WHM_ERRMESG("S_strcpy");
-    return WHM_ERROR;
-  }
-  strcat(path, "/");
-  strcat(path, config->employer);
-  strcat(path, ".d");
-  strcat(path, "/");
-  strcat(path, time_o->year);
   if ((stream = fopen(path, "r")) != NULL){
     fclose(stream);
     stream = NULL;
@@ -741,7 +837,7 @@ int whm_new_year_dir(whm_config_T *config,
 
 /*
  * Find the first weekday of time_o's month,
- * and get the week number of the its first week 
+ * and get the week number of its first week.
  */
 int whm_find_first_dom(whm_time_T *time_o,
 		       int *week_num)

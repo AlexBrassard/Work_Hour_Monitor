@@ -492,7 +492,6 @@ int main(int argc, char **argv)
     }
   }
   else 
-    /* Menu goes here. */
     if (whm_main_menu(configs, sheets, time_o, &c_ind) != 0){
       WHM_ERRMESG("Whm_main_menu");
       goto errjmp;
@@ -663,6 +662,7 @@ int whm_print_op(whm_option_T *option,
   int ind = 0, num = 0, valid = 0;
   char temp[WHM_TIME_STR_S];
   char path[WHM_MAX_PATHNAME_S];
+  whm_time_T *saved_time_o = NULL;
 
   if (!option || !option->name || option->name[0] == '\0'){
     errno = EINVAL;
@@ -687,56 +687,81 @@ int whm_print_op(whm_option_T *option,
     errno = WHM_INVALIDCOMPANY;
     return WHM_ERROR;
   }
-  
+  if ((saved_time_o = whm_init_time_type()) == NULL){
+    WHM_ERRMESG("Whm_init_time_type");
+    return WHM_ERROR;
+  }
+  if (whm_copy_time(saved_time_o, time_o) == NULL){
+    WHM_ERRMESG("Whm_copy_time");
+    goto errjmp;
+  }
   /* If the year and/or month argument was given, modify the time object accordingly. */
   if (option->year != -1)
     if (s_strcpy(time_o->year,
 		 s_itoa(temp, option->year, WHM_TIME_STR_S),
 		 WHM_TIME_STR_S) == NULL){
       WHM_ERRMESG("S_strcpy");
-      return WHM_ERROR;
+      goto errjmp;
     }
   if (option->month[0] != '\0'){
     if (!isdigit(option->month[0])){
       if ((num = whm_get_month_number(option->month)) == WHM_ERROR){
 	WHM_ERRMESG("Whm_get_month_number");
-	return WHM_ERROR;
+	goto errjmp;
       }
       if (s_strcpy(option->month,
 		   s_itoa(temp, num, WHM_TIME_STR_S),
 		   WHM_TIME_STR_S) == NULL){
 	WHM_ERRMESG("S_strcpy");
-	return WHM_ERROR;
+	goto errjmp;
       }
     }
     if (s_strcpy(time_o->month, option->month, WHM_TIME_STR_S) == NULL){
       WHM_ERRMESG("S_strcpy");
-      return WHM_ERROR;
+      goto errjmp;
     }
     if ((valid = whm_validate_time_field(time_o, T_MONTH)) <= 0){
       if (valid == 0) errno = WHM_INVALIDVALUE;
       WHM_ERRMESG("Whm_validate_time_field");
-      return WHM_ERROR;
+      goto errjmp;
     }
   }
   /* Make the required sheet's pathname. */
   if (whm_make_sheet_path(path, time_o, configs[ind]) == NULL){
     WHM_ERRMESG("Whm_make_sheet_path");
-    return WHM_ERROR;
+    goto errjmp;
   }
   /* Read the required sheet. */
   if (whm_read_sheet(path, configs[ind], time_o, sheets[ind]) != 0){
     WHM_ERRMESG("Whm_read_sheet");
-    return WHM_ERROR;
+    goto errjmp;
   }
   
   /* Print the required sheet. */
   if (whm_write_sheet(stdout, configs[ind], time_o, sheets[ind]) != 0) {
     WHM_ERRMESG("Whm_write_sheet");
-    return WHM_ERROR;
+    goto errjmp;
+  }
+
+  /* Restore the saved time object. */
+  if (whm_copy_time(time_o, saved_time_o) == NULL){
+    WHM_ERRMESG("Whm_copy_time");
+    goto errjmp;
+  }
+  if (saved_time_o) {
+    whm_free_time_type(saved_time_o);
+    saved_time_o = NULL;
   }
 
   return 0;
+
+ errjmp:
+  if (saved_time_o) {
+    whm_free_time_type(saved_time_o);
+    saved_time_o = NULL;
+  }
+  return WHM_ERROR;
+  
 } /* whm_print_op() */
 
 
@@ -937,7 +962,7 @@ int whm_update_op(whm_option_T *option,
   sheets[c_ind]->week[week_ind]->day[day_ind]->pos_hours[pos_ind] = option->worked_hours;
   
   /* Update the sheet. */
-  if (whm_update_sheet(configs[c_ind], sheets[c_ind]) != 0){
+  if (whm_update_sheet(configs[c_ind], sheets[c_ind], time_o) != 0){
     WHM_ERRMESG("Whm_update_sheet");
     goto errjmp;
   }
@@ -1181,6 +1206,12 @@ void whm_PRINT_sheet(whm_sheet_T *sheet, whm_config_T *config)
       fprintf(stderr, "\nPer position earnings: ");
       for (c = 0; c < config->numof_positions; c++)
 	fprintf(stderr, "%f  ", sheet->week[i]->day[b]->pos_earnings[c]);
+      fprintf(stderr, "\nPer position ot hours: ");
+      for (c = 0; c < config->numof_positions; c++)
+	fprintf(stderr, "%f ", sheet->week[i]->day[b]->pos_ot_hours[c]);
+      fprintf(stderr, "\nPer positions ot earnings: ");
+      for (c = 0; c < config->numof_positions; c++)
+	fprintf(stderr, "%f ", sheet->week[i]->day[b]->pos_ot_earnings[c]);
       fprintf(stderr, "\n");
     }
     fprintf(stderr, "\n");
